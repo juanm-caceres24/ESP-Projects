@@ -996,3 +996,5 @@
 69924	70177	7472953966928873	D:/Documents/GitHub/ESP32-Examples/ESP32-BlinkLED/build/.bin_timestamp	5984b167dc3f767
 70178	70256	0	esp-idf/esptool_py/CMakeFiles/app_check_size	81d728968bca0a99
 70178	70256	0	D:/Documents/GitHub/ESP32-Examples/ESP32-BlinkLED/build/esp-idf/esptool_py/CMakeFiles/app_check_size	81d728968bca0a99
+43	471582	0	CMakeFiles/confserver	7062321adbc051e
+43	471582	0	D:/Documents/GitHub/ESP32-Examples/ESP32-BlinkLED/build/CMakeFiles/confserver	7062321adbc051e
