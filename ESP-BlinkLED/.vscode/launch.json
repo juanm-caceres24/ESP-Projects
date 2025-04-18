@@ -12,9 +12,9 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug",
-            "executable": "C:/Users/juanm/Documents/GitHub/ESP-Projects/ESP-BlinkLED/.pio/build/esp32dev/firmware.elf",
+            "executable": "/home/juanm_caceres24/Documents/GitHub/ESP-Projects/ESP-BlinkLED/.pio/build/esp32dev/firmware.elf",
             "projectEnvName": "esp32dev",
-            "toolchainBinDir": "C:/Users/juanm/.platformio/packages/toolchain-xtensa-esp32/bin",
+            "toolchainBinDir": "/home/juanm_caceres24/.platformio/packages/toolchain-xtensa-esp-elf/bin",
             "internalConsoleOptions": "openOnSessionStart",
             "preLaunchTask": {
                 "type": "PlatformIO",
@@ -25,18 +25,18 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug (skip Pre-Debug)",
-            "executable": "C:/Users/juanm/Documents/GitHub/ESP-Projects/ESP-BlinkLED/.pio/build/esp32dev/firmware.elf",
+            "executable": "/home/juanm_caceres24/Documents/GitHub/ESP-Projects/ESP-BlinkLED/.pio/build/esp32dev/firmware.elf",
             "projectEnvName": "esp32dev",
-            "toolchainBinDir": "C:/Users/juanm/.platformio/packages/toolchain-xtensa-esp32/bin",
+            "toolchainBinDir": "/home/juanm_caceres24/.platformio/packages/toolchain-xtensa-esp-elf/bin",
             "internalConsoleOptions": "openOnSessionStart"
         },
         {
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug (without uploading)",
-            "executable": "C:/Users/juanm/Documents/GitHub/ESP-Projects/ESP-BlinkLED/.pio/build/esp32dev/firmware.elf",
+            "executable": "/home/juanm_caceres24/Documents/GitHub/ESP-Projects/ESP-BlinkLED/.pio/build/esp32dev/firmware.elf",
             "projectEnvName": "esp32dev",
-            "toolchainBinDir": "C:/Users/juanm/.platformio/packages/toolchain-xtensa-esp32/bin",
+            "toolchainBinDir": "/home/juanm_caceres24/.platformio/packages/toolchain-xtensa-esp-elf/bin",
             "internalConsoleOptions": "openOnSessionStart",
             "loadMode": "manual"
         }
