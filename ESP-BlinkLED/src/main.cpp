@@ -7,8 +7,7 @@ uint32_t DELAY_TIME = 1000;
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   Serial.begin(9600);
-  delay(1000);
-  Serial.print("Select delay: ");
+  Serial.println("Set delay:");
   while (true) {
     if (Serial.available() > 0) {
       String input = Serial.readStringUntil('\n');
@@ -16,11 +15,11 @@ void setup() {
       if (DELAY_TIME > 0) {
         break;
       } else {
-        Serial.print("Invalid input. Please enter a positive number: ");
+        Serial.println("Invalid input. Please enter a positive number:");
       }
     }
   }
-  Serial.print("Delay set to: " + String(DELAY_TIME) + " ms\n");
+  Serial.println("Delay set to: " + String(DELAY_TIME) + " ms.");
 }
 
 void loop() {
