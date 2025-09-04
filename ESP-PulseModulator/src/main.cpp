@@ -1,11 +1,11 @@
 #include <Arduino.h>
 
-#define LED_0_PIN 25
-#define LED_1_PIN 26
-#define BUTTON_0_PIN 32
-#define BUTTON_1_PIN 33
-#define POTENTIOMETER_0_PIN 34
-#define POTENTIOMETER_1_PIN 35
+#define LED_0_PIN 12
+#define LED_1_PIN 13
+#define BUTTON_0_PIN 25
+#define BUTTON_1_PIN 26
+#define POTENTIOMETER_0_PIN 32
+#define POTENTIOMETER_1_PIN 33
 #define REBOUND_DELAY 200
 #define TIME_IN_US 10 // 10us are 0.01ms
 #define MIN_CYCLES 5000
@@ -95,7 +95,7 @@ void button1ISR() {
     }
 }
 
-void timerISR() {
+void IRAM_ATTR timerISR() {
     led_0_counter++;
     led_1_counter++;
 }
