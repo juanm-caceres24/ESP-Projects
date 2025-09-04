@@ -9,18 +9,22 @@
 #define LED_0_PIN 12
 #define LED_1_PIN 13
 #define TIME_IN_US 100 // Timer interval in microseconds
-#define CYCLES_OF_BUTTON_DEBOUNCE 5000 // Number of cycles (of TIME_IN_US) to consider a valid button press (5000 * 100us = 500ms)
-#define CYCLES_OF_PWM 100 // Number of cycles (of TIME_IN_US) to consider a PWM cycle (100 * 100us = 10ms)
-#define MAX_BRIGHTNESS 10
+#define DEBOUNCE_DELAY_CYCLES 2000 // Cycles of TIME_IN_US that the button will be ignored (5000 * 100us = 500ms)
+#define PWM_CYCLES 100 // Number of cycles (of TIME_IN_US) to consider a PWM cycle (100 * 100us = 10ms)
+#define MAX_BRIGHTNESS 5
 
-int static debounce_set = 0; // Time when the button was pressed
-int static debounce_counter = 0; // Continuous counter similar to millis()
+int static debounce_0_counter = 0; // Decrement counter of cycles of TIME_IN_US
+int static debounce_1_counter = 0;
+int static debounce_2_counter = 0;
+int static debounce_3_counter = 0;
+int static debounce_4_counter = 0;
+int static debounce_5_counter = 0;
 int static led_0_working_state = 1; // Working state to know if the general state of the led is ON or OFF
 int static led_1_working_state = 1; // Working state to know if the general state of the led is ON or OFF
 int static led_0_brightness = MAX_BRIGHTNESS; // Brightness level of LED 0
 int static led_1_brightness = MAX_BRIGHTNESS; // Brightness level of LED 1
-int static pwm_counter_0 = 0; // Counter for PWM cycles of LED 0
-int static pwm_counter_1 = 0; // Counter for PWM cycles of LED 1
+int static pwm_0_counter = 0; // Counter for PWM cycles of LED 0
+int static pwm_1_counter = 0; // Counter for PWM cycles of LED 1
 hw_timer_t static *timer = NULL;
 
 int configPins();
@@ -79,8 +83,8 @@ int configTimer() {
 }
 
 void button0ISR() {
-    if (debounce_counter - debounce_set > CYCLES_OF_BUTTON_DEBOUNCE) {
-        debounce_set = debounce_counter;
+    if (debounce_0_counter == 0) {
+        debounce_0_counter = DEBOUNCE_DELAY_CYCLES; // Set the debounce counter
         led_0_working_state = !led_0_working_state; // Toggle the working state
         Serial.print("Button 0 pressed, LED 0 state: ");
         Serial.println(led_0_working_state);
@@ -88,8 +92,8 @@ void button0ISR() {
 }
 
 void button1ISR() {
-    if (debounce_counter - debounce_set > CYCLES_OF_BUTTON_DEBOUNCE) {
-        debounce_set = debounce_counter;
+    if (debounce_1_counter == 0) {
+        debounce_1_counter = DEBOUNCE_DELAY_CYCLES; // Set the debounce counter
         if (led_0_brightness > 0) {
             led_0_brightness--;
         }
@@ -99,8 +103,8 @@ void button1ISR() {
 }
 
 void button2ISR() {
-    if (debounce_counter - debounce_set > CYCLES_OF_BUTTON_DEBOUNCE) {
-        debounce_set = debounce_counter;
+    if (debounce_2_counter == 0) {
+        debounce_2_counter = DEBOUNCE_DELAY_CYCLES; // Set the debounce counter
         if (led_0_brightness < MAX_BRIGHTNESS) {
             led_0_brightness++;
         }
@@ -110,8 +114,8 @@ void button2ISR() {
 }
 
 void button3ISR() {
-    if (debounce_counter - debounce_set > CYCLES_OF_BUTTON_DEBOUNCE) {
-        debounce_set = debounce_counter;
+    if (debounce_3_counter == 0) {
+        debounce_3_counter = DEBOUNCE_DELAY_CYCLES; // Set the debounce counter
         led_1_working_state = !led_1_working_state; // Toggle the working state
         Serial.print("Button 3 pressed, LED 1 state: ");
         Serial.println(led_1_working_state);
@@ -119,8 +123,8 @@ void button3ISR() {
 }
 
 void button4ISR() {
-    if (debounce_counter - debounce_set > CYCLES_OF_BUTTON_DEBOUNCE) {
-        debounce_set = debounce_counter;
+    if (debounce_4_counter == 0) {
+        debounce_4_counter = DEBOUNCE_DELAY_CYCLES; // Set the debounce counter
         if (led_1_brightness > 0) {
             led_1_brightness--;
         }
@@ -130,8 +134,8 @@ void button4ISR() {
 }
 
 void button5ISR() {
-    if (debounce_counter - debounce_set > CYCLES_OF_BUTTON_DEBOUNCE) {
-        debounce_set = debounce_counter;
+    if (debounce_5_counter == 0) {
+        debounce_5_counter = DEBOUNCE_DELAY_CYCLES; // Set the debounce counter
         if (led_1_brightness < MAX_BRIGHTNESS) {
             led_1_brightness++;
         }
@@ -141,20 +145,37 @@ void button5ISR() {
 }
 
 void IRAM_ATTR timerISR() {
-    debounce_counter++; // Increment the debounce counter every TIME_IN_US
-    pwm_counter_0++;
-    if (pwm_counter_0 >= CYCLES_OF_PWM) {
-        pwm_counter_0 = 0; // Reset the PWM counter after a full cycle
+    if (debounce_0_counter > 0) {
+        debounce_0_counter--; // Decrement the debounce counter
     }
-    pwm_counter_1++;
-    if (pwm_counter_1 >= CYCLES_OF_PWM) {
-        pwm_counter_1 = 0; // Reset the PWM counter after a full cycle
+    if (debounce_1_counter > 0) {
+        debounce_1_counter--; // Decrement the debounce counter
+    }
+    if (debounce_2_counter > 0) {
+        debounce_2_counter--; // Decrement the debounce counter
+    }
+    if (debounce_3_counter > 0) {
+        debounce_3_counter--; // Decrement the debounce counter
+    }
+    if (debounce_4_counter > 0) {
+        debounce_4_counter--; // Decrement the debounce counter
+    }
+    if (debounce_5_counter > 0) {
+        debounce_5_counter--; // Decrement the debounce counter
+    }
+    pwm_0_counter++;
+    if (pwm_0_counter >= PWM_CYCLES) {
+        pwm_0_counter = 0; // Reset the PWM counter after a full cycle
+    }
+    pwm_1_counter++;
+    if (pwm_1_counter >= PWM_CYCLES) {
+        pwm_1_counter = 0; // Reset the PWM counter after a full cycle
     }
 }
 
 void updateLED0() {
     if (led_0_working_state) {
-        if (pwm_counter_0 < (led_0_brightness * (CYCLES_OF_PWM / MAX_BRIGHTNESS))) {
+        if (pwm_0_counter < (led_0_brightness * (PWM_CYCLES / MAX_BRIGHTNESS))) {
             digitalWrite(LED_0_PIN, HIGH);
         } else {
             digitalWrite(LED_0_PIN, LOW);
@@ -166,7 +187,7 @@ void updateLED0() {
 
 void updateLED1() {
     if (led_1_working_state) {
-        if (pwm_counter_1 < (led_1_brightness * (CYCLES_OF_PWM / MAX_BRIGHTNESS))) {
+        if (pwm_1_counter < (led_1_brightness * (PWM_CYCLES / MAX_BRIGHTNESS))) {
             digitalWrite(LED_1_PIN, HIGH);
         } else {
             digitalWrite(LED_1_PIN, LOW);
