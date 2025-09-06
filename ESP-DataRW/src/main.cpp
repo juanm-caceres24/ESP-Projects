@@ -186,36 +186,101 @@ void setDelayCounter() {
 
 void readPotentiometers() {
     if (mode_status == 0) { // recording mode
-        potentiometer_0_value = map(analogRead(POTENTIOMETER_0_PIN), 0, 4095, 0, 63);
-        data_0[data_iterator] = potentiometer_0_value;
-        potentiometer_1_value = map(analogRead(POTENTIOMETER_1_PIN), 0, 4095, 0, 63);
-        data_1[data_iterator] = potentiometer_1_value;
+        potentiometer_0_value = map(analogRead(POTENTIOMETER_0_PIN), 0, 4095, 0, 10);
+        switch (potentiometer_0_value) {
+            case 0:
+                data_0[data_iterator] = 0b00000001; // min value
+                break;
+            case 1:
+                data_0[data_iterator] = 0b00000011;
+                break;
+            case 2:
+                data_0[data_iterator] = 0b00000010;
+                break;
+            case 3:
+                data_0[data_iterator] = 0b00000110;
+                break;
+            case 4:
+                data_0[data_iterator] = 0b00000100;
+                break;
+            case 5:
+                data_0[data_iterator] = 0b00001100;
+                break;
+            case 6:
+                data_0[data_iterator] = 0b00001000;
+                break;
+            case 7:
+                data_0[data_iterator] = 0b00011000;
+                break;
+            case 8:
+                data_0[data_iterator] = 0b00010000;
+                break;
+            case 9:
+                data_0[data_iterator] = 0b00110000;
+                break;
+            case 10:
+                data_0[data_iterator] = 0b00100000; // max value
+                break;
+            default:
+                data_0[data_iterator] = 0b11111111; // should not happen
+                break;
+        }
+        potentiometer_1_value = map(analogRead(POTENTIOMETER_1_PIN), 0, 4095, 0, 10);
+        switch (potentiometer_1_value) {
+            case 0:
+                data_1[data_iterator] = 0b00000001; // min value
+                break;
+            case 1:
+                data_1[data_iterator] = 0b00000011;
+                break;
+            case 2:
+                data_1[data_iterator] = 0b00000010;
+                break;
+            case 3:
+                data_1[data_iterator] = 0b00000110;
+                break;
+            case 4:
+                data_1[data_iterator] = 0b00000100;
+                break;
+            case 5:
+                data_1[data_iterator] = 0b00001100;
+                break;
+            case 6:
+                data_1[data_iterator] = 0b00001000;
+                break;
+            case 7:
+                data_1[data_iterator] = 0b00011000;
+                break;
+            case 8:
+                data_1[data_iterator] = 0b00010000;
+                break;
+            case 9:
+                data_1[data_iterator] = 0b00110000;
+                break;
+            case 10:
+                data_1[data_iterator] = 0b00100000; // max value
+                break;
+            default:
+                data_1[data_iterator] = 0b11111111; // should not happen
+                break;
+        }
     }
 }
 
 void updateLEDs() {
-    if (mode_status == 0) { // recording mode
-        digitalWrite(LED_0_PIN, LOW);
-        digitalWrite(LED_1_PIN, LOW);
-        digitalWrite(LED_2_PIN, LOW);
-        digitalWrite(LED_3_PIN, LOW);
-        digitalWrite(LED_4_PIN, LOW);
-        digitalWrite(LED_5_PIN, LOW);
-    } else { // playing mode
-        if (potentiometer_selection == 0) { // potentiometer 0
-            digitalWrite(LED_0_PIN, (data_0[data_iterator] & 0x01)); // 0b00000001
-            digitalWrite(LED_1_PIN, (data_0[data_iterator] & 0x02)); // 0b00000010
-            digitalWrite(LED_2_PIN, (data_0[data_iterator] & 0x04)); // 0b00000100
-            digitalWrite(LED_3_PIN, (data_0[data_iterator] & 0x08)); // 0b00001000
-            digitalWrite(LED_4_PIN, (data_0[data_iterator] & 0x10)); // 0b00010000
-            digitalWrite(LED_5_PIN, (data_0[data_iterator] & 0x20)); // 0b00100000
-        } else { // potentiometer 1
-            digitalWrite(LED_0_PIN, (data_1[data_iterator] & 0x01)); // 0b00000001
-            digitalWrite(LED_1_PIN, (data_1[data_iterator] & 0x02)); // 0b00000010
-            digitalWrite(LED_2_PIN, (data_1[data_iterator] & 0x04)); // 0b00000100
-            digitalWrite(LED_3_PIN, (data_1[data_iterator] & 0x08)); // 0b00001000
-            digitalWrite(LED_4_PIN, (data_1[data_iterator] & 0x10)); // 0b00010000
-            digitalWrite(LED_5_PIN, (data_1[data_iterator] & 0x20)); // 0b00100000
-        }
+    if (potentiometer_selection == 0) { // potentiometer 0
+        digitalWrite(LED_0_PIN, (data_0[data_iterator] & 0x01)); // 0b00000001
+        digitalWrite(LED_1_PIN, (data_0[data_iterator] & 0x02)); // 0b00000010
+        digitalWrite(LED_2_PIN, (data_0[data_iterator] & 0x04)); // 0b00000100
+        digitalWrite(LED_3_PIN, (data_0[data_iterator] & 0x08)); // 0b00001000
+        digitalWrite(LED_4_PIN, (data_0[data_iterator] & 0x10)); // 0b00010000
+        digitalWrite(LED_5_PIN, (data_0[data_iterator] & 0x20)); // 0b00100000
+    } else { // potentiometer 1
+        digitalWrite(LED_0_PIN, (data_1[data_iterator] & 0x01)); // 0b00000001
+        digitalWrite(LED_1_PIN, (data_1[data_iterator] & 0x02)); // 0b00000010
+        digitalWrite(LED_2_PIN, (data_1[data_iterator] & 0x04)); // 0b00000100
+        digitalWrite(LED_3_PIN, (data_1[data_iterator] & 0x08)); // 0b00001000
+        digitalWrite(LED_4_PIN, (data_1[data_iterator] & 0x10)); // 0b00010000
+        digitalWrite(LED_5_PIN, (data_1[data_iterator] & 0x20)); // 0b00100000
     }
 }
