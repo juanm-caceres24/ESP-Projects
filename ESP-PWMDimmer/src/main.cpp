@@ -1,17 +1,17 @@
 #include <Arduino.h>
 
-#define BUTTON_0_PIN 32
-#define BUTTON_1_PIN 33
-#define BUTTON_2_PIN 25
-#define BUTTON_3_PIN 26
-#define BUTTON_4_PIN 27
-#define BUTTON_5_PIN 14
-#define LED_0_PIN 12
-#define LED_1_PIN 13
+#define BUTTON_0_PIN 33
+#define BUTTON_1_PIN 32
+#define BUTTON_2_PIN 16
+#define BUTTON_3_PIN 17
+#define BUTTON_4_PIN 5
+#define BUTTON_5_PIN 18
+#define LED_0_PIN 13
+#define LED_1_PIN 12
 #define TIME_IN_US 100 // Timer interval in microseconds
-#define DEBOUNCE_DELAY_CYCLES 2000 // Cycles of TIME_IN_US that the button will be ignored (5000 * 100us = 500ms)
+#define DEBOUNCE_DELAY_CYCLES 2000 // Cycles of TIME_IN_US that the button will be ignored (2000 * 100us = 200ms)
 #define PWM_CYCLES 100 // Number of cycles (of TIME_IN_US) to consider a PWM cycle (100 * 100us = 10ms)
-#define MAX_BRIGHTNESS 5
+#define MAX_BRIGHTNESS 8
 
 int static debounce_0_counter = 0; // Decrement counter of cycles of TIME_IN_US
 int static debounce_1_counter = 0;
