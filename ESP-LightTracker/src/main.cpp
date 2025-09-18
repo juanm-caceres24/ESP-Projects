@@ -4,25 +4,26 @@
 #define BUTTON_1_PIN 32
 #define BUTTON_2_PIN 16
 #define BUTTON_3_PIN 17
-#define BUTTON_4_PIN 5
-#define BUTTON_5_PIN 18
+//#define BUTTON_4_PIN 5
+//#define BUTTON_5_PIN 18
+
 #define PWM_0_PIN 13
 #define PWM_1_PIN 12
 #define MOTOR_0_DIRECTION_0_PIN 14
 #define MOTOR_0_DIRECTION_1_PIN 27
 #define MOTOR_1_DIRECTION_0_PIN 26
 #define MOTOR_1_DIRECTION_1_PIN 25
+
 #define TIME_IN_US 100 // Timer interval in microseconds
 #define DEBOUNCE_DELAY_CYCLES 2000 // Cycles of TIME_IN_US that the button will be ignored (2000 * 100us = 200ms)
 #define PWM_CYCLES 100 // Number of cycles (of TIME_IN_US) to consider a PWM cycle (100 * 100us = 10ms)
+
 #define MAX_THROTTLE 4 // Maximum throttle level
 
 int static debounce_0_counter = 0; // Decrement counter of cycles of TIME_IN_US
 int static debounce_1_counter = 0;
 int static debounce_2_counter = 0;
 int static debounce_3_counter = 0;
-int static debounce_4_counter = 0;
-int static debounce_5_counter = 0;
 int static motor_0_working_state = 0; // Working state of Motor 0 (0 = off, 1 = on)
 int static motor_1_working_state = 0; // Working state of Motor 1 (0 = off, 1 = on)
 int static motor_0_direction = 0; // Direction of Motor 0
@@ -40,8 +41,6 @@ void button0ISR();
 void button1ISR();
 void button2ISR();
 void button3ISR();
-void button4ISR();
-void button5ISR();
 void timerISR();
 void updateMotor0();
 void updateMotor1();
@@ -152,48 +151,6 @@ void button3ISR() {
     }
 }
 
-void button4ISR() {
-    if (debounce_4_counter == 0) {
-        debounce_4_counter = DEBOUNCE_DELAY_CYCLES; // Set the debounce counter
-        if (motor_1_direction == 0) { // If direction is forward
-            if (motor_1_throttle > 0) {
-                motor_1_throttle--; // Decrease throttle
-            } else {
-                motor_1_direction = 1; // Change direction to reverse if throttle is zero
-            }
-        } else { // If direction is reverse
-            if (motor_1_throttle < MAX_THROTTLE) {
-                motor_1_throttle++; // Increase throttle
-            }
-        }
-        Serial.print("Button 4 pressed, Motor 1 throttle: ");
-        Serial.print(motor_1_throttle);
-        Serial.print(", Direction: ");
-        Serial.println(motor_1_direction == 0 ? "Forward" : "Reverse");
-    }
-}
-
-void button5ISR() {
-    if (debounce_5_counter == 0) {
-        debounce_5_counter = DEBOUNCE_DELAY_CYCLES; // Set the debounce counter
-        if (motor_1_direction == 0) { // If direction is forward
-            if (motor_1_throttle < MAX_THROTTLE) {
-                motor_1_throttle++; // Increase throttle
-            }
-        } else { // If direction is reverse
-            if (motor_1_throttle > 0) {
-                motor_1_throttle--; // Decrease throttle
-            } else {
-                motor_1_direction = 0; // Change direction to forward if throttle is zero
-            }
-        }
-        Serial.print("Button 5 pressed, Motor 1 throttle: ");
-        Serial.print(motor_1_throttle);
-        Serial.print(", Direction: ");
-        Serial.println(motor_1_direction == 0 ? "Forward" : "Reverse");
-    }
-}
-
 void IRAM_ATTR timerISR() {
     if (debounce_0_counter > 0) {
         debounce_0_counter--; // Decrement the debounce counter
@@ -206,12 +163,6 @@ void IRAM_ATTR timerISR() {
     }
     if (debounce_3_counter > 0) {
         debounce_3_counter--; // Decrement the debounce counter
-    }
-    if (debounce_4_counter > 0) {
-        debounce_4_counter--; // Decrement the debounce counter
-    }
-    if (debounce_5_counter > 0) {
-        debounce_5_counter--; // Decrement the debounce counter
     }
     pwm_0_counter++;
     if (pwm_0_counter >= PWM_CYCLES) {
