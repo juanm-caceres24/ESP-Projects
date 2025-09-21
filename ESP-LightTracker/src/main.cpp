@@ -25,12 +25,12 @@
 #define PWM_CYCLES              100         // Number of cycles (of TIME_IN_US) to consider a PWM cycle (100 * 0.1ms = 10ms)
 
 #define KP_0                    0.01        // Proportional gain for the control algorithm
-#define KI_0                    0.001       // Integral gain for the control algorithm
-#define KD_0                    0.000007    // Derivative gain for the control algorithm
+#define KI_0                    0.00007     // Integral gain for the control algorithm
+#define KD_0                    0.00001     // Derivative gain for the control algorithm
 
 #define KP_1                    0.01        // Proportional gain for the control algorithm
-#define KI_1                    0.001       // Integral gain for the control algorithm
-#define KD_1                    0.000007    // Derivative gain for the control algorithm
+#define KI_1                    0.00007     // Integral gain for the control algorithm
+#define KD_1                    0.00001     // Derivative gain for the control algorithm
 
 int static debounce_0_counter = 0; // Counter for debouncing Button 0
 int static debounce_1_counter = 0; // Counter for debouncing Button 1
