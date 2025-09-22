@@ -27,10 +27,12 @@
 #define KP_0                    0.01        // Proportional gain for the control algorithm
 #define KI_0                    0.00007     // Integral gain for the control algorithm
 #define KD_0                    0.00001     // Derivative gain for the control algorithm
+#define WINDUP_LIMIT_0          1000        // Integral windup limit for Motor 0
 
 #define KP_1                    0.01        // Proportional gain for the control algorithm
 #define KI_1                    0.00007     // Integral gain for the control algorithm
 #define KD_1                    0.00001     // Derivative gain for the control algorithm
+#define WINDUP_LIMIT_1          1000        // Integral windup limit for Motor 1
 
 int static debounce_0_counter = 0; // Counter for debouncing Button 0
 int static debounce_1_counter = 0; // Counter for debouncing Button 1
@@ -219,6 +221,7 @@ int calculatePID_0() {
     measured_value_0 = ldr_0_value - ldr_1_value; // Current value (difference between LDRs)
     error_0 = setpoint_0 - measured_value_0;
     integral_0 += error_0 * (TIME_IN_US / 1000000.0); // Integrate the error over time
+    integral_0 = constrain(integral_0, -WINDUP_LIMIT_0, WINDUP_LIMIT_0); // Prevent integral windup
     derivative_0 = (error_0 - previous_error_0) / (TIME_IN_US / 1000000.0); // Derivative of the error
     output_0 = KP_0 * error_0 + KI_0 * integral_0 + KD_0 * derivative_0;
     previous_error_0 = error_0;
@@ -229,6 +232,7 @@ int calculatePID_1() {
     measured_value_1 = ldr_2_value - ldr_3_value; // Current value (difference between LDRs)
     error_1 = setpoint_1 - measured_value_1;
     integral_1 += error_1 * (TIME_IN_US / 1000000.0); // Integrate the error over time
+    integral_1 = constrain(integral_1, -WINDUP_LIMIT_1, WINDUP_LIMIT_1); // Prevent integral windup
     derivative_1 = (error_1 - previous_error_1) / (TIME_IN_US / 1000000.0); // Derivative of the error
     output_1 = KP_1 * error_1 + KI_1 * integral_1 + KD_1 * derivative_1;
     previous_error_1 = error_1;
