@@ -1,38 +1,38 @@
 #include <Arduino.h>
 
-#define BUTTON_0_PIN            16          // Enable/Disable Button
-#define BUTTON_1_PIN            17
-#define BUTTON_2_PIN            5
-#define BUTTON_3_PIN            18
+#define BUTTON_0_PIN 16 // Enable/Disable Button
+#define BUTTON_1_PIN 17
+#define BUTTON_2_PIN 5
+#define BUTTON_3_PIN 18
 
-#define LDR_0_PIN               33          // Right LDR
-#define LDR_1_PIN               32          // Left LDR
-#define LDR_2_PIN               35          // Up LDR
-#define LDR_3_PIN               34          // Down LDR
+#define LDR_0_PIN 33 // Right LDR
+#define LDR_1_PIN 32 // Left LDR
+#define LDR_2_PIN 35 // Up LDR
+#define LDR_3_PIN 34 // Down LDR
 
-#define PWM_0_PIN               13          // Right-Left Motor PWM pin
+#define PWM_0_PIN 13 // Right-Left Motor PWM pin
 #define MOTOR_0_DIRECTION_0_PIN 14
 #define MOTOR_0_DIRECTION_1_PIN 27
 
-#define PWM_1_PIN               12          // Up-Down Motor PWM pin
+#define PWM_1_PIN 12 // Up-Down Motor PWM pin
 #define MOTOR_1_DIRECTION_0_PIN 26
 #define MOTOR_1_DIRECTION_1_PIN 25
 
-#define MAX_THROTTLE            32          // Maximum throttle level
+#define MAX_THROTTLE 32 // Maximum throttle level
 
-#define TIME_IN_US              100         // Timer interval in microseconds (0.1ms)
-#define DEBOUNCE_DELAY_CYCLES   2000        // Cycles of TIME_IN_US that the button will be ignored (2000 * 0.1ms = 200ms)
-#define PWM_CYCLES              100         // Number of cycles (of TIME_IN_US) to consider a PWM cycle (100 * 0.1ms = 10ms)
+#define TIME_IN_US 100 // Timer interval in microseconds (0.1ms)
+#define DEBOUNCE_DELAY_CYCLES 2000 // Cycles of TIME_IN_US that the button will be ignored (2000 * 0.1ms = 200ms)
+#define PWM_CYCLES 100 // Number of cycles (of TIME_IN_US) to consider a PWM cycle (100 * 0.1ms = 10ms)
 
-#define KP_0                    0.01        // Proportional gain for the control algorithm
-#define KI_0                    0.00007     // Integral gain for the control algorithm
-#define KD_0                    0.00001     // Derivative gain for the control algorithm
-#define WINDUP_LIMIT_0          1000        // Integral windup limit for Motor 0
+#define KP_0 0.01 // Proportional gain for the control algorithm
+#define KI_0 0.00007 // Integral gain for the control algorithm
+#define KD_0 0.00001 // Derivative gain for the control algorithm
+#define WINDUP_LIMIT_0 1000 // Integral windup limit for Motor 0
 
-#define KP_1                    0.01        // Proportional gain for the control algorithm
-#define KI_1                    0.00007     // Integral gain for the control algorithm
-#define KD_1                    0.00001     // Derivative gain for the control algorithm
-#define WINDUP_LIMIT_1          1000        // Integral windup limit for Motor 1
+#define KP_1 0.01 // Proportional gain for the control algorithm
+#define KI_1 0.00007 // Integral gain for the control algorithm
+#define KD_1 0.00001 // Derivative gain for the control algorithm
+#define WINDUP_LIMIT_1 1000 // Integral windup limit for Motor 1
 
 int static debounce_0_counter = 0; // Counter for debouncing Button 0
 int static debounce_1_counter = 0; // Counter for debouncing Button 1
