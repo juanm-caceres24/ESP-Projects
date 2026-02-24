@@ -1,27 +1,29 @@
 #include <Arduino.h>
 
 #define ADC_PIN 32
+#define CALIB_SAMPLES 50
+#define CALIB_DELAY_BETWEEN_SAMPLES 10
 
-int value = 0;
-int minValue = 4095;
-int maxValue = 0;
-int minDeadZone = 0;
-int maxDeadZone = 0;
-int adjustedMin = 0;
-int adjustedMax = 0;
-int percentage = 0;
+uint16_t value = 0;
+uint16_t minValue = 4095;
+uint16_t maxValue = 0;
+uint16_t minDeadZone = 0;
+uint16_t maxDeadZone = 0;
+uint16_t adjustedMin = 0;
+uint16_t adjustedMax = 0;
+uint16_t percentage = 0;
 
 void calibrationWizard() {
     Serial.println("Starting calibration...");
     Serial.println("Please set the magnet in minimum position in 3 seconds...");
     delay(1000);
-    for (int i = 0; i < 3; i++) {
+    for (uint8_t i = 0; i < 3; i++) {
         delay(1000);
         Serial.println(i + 1);
     }
     delay(1000);
     Serial.println("Calibrating minimum position...");
-    for (int i = 0; i < 50; i++) {
+    for (uint8_t i = 0; i < CALIB_SAMPLES; i++) {
         value = analogRead(ADC_PIN);
         if (value < minValue) {
             minValue = value;
@@ -29,18 +31,18 @@ void calibrationWizard() {
         if (minValue + minDeadZone < value) {
             minDeadZone = value - minValue;
         }
-        delay(10);
+        delay(CALIB_DELAY_BETWEEN_SAMPLES);
     }
     Serial.println("Minimum position calibrated.");
     Serial.println("Please set the magnet in maximum position in 3 seconds...");
     delay(1000);
-    for (int i = 0; i < 3; i++) {
+    for (uint8_t i = 0; i < 3; i++) {
         delay(1000);
         Serial.println(i + 1);
     }
     delay(1000);
     Serial.println("Calibrating maximum position...");
-    for (int i = 0; i < 50; i++) {
+    for (uint8_t i = 0; i < CALIB_SAMPLES; i++) {
         value = analogRead(ADC_PIN);
         if (value > maxValue) {
             maxValue = value;
@@ -48,7 +50,7 @@ void calibrationWizard() {
         if (maxValue - maxDeadZone > value) {
             maxDeadZone = maxValue - value;
         }
-        delay(10);
+        delay(CALIB_DELAY_BETWEEN_SAMPLES);
     }
     Serial.println("Maximum position calibrated.");
     adjustedMin = minValue + minDeadZone;
