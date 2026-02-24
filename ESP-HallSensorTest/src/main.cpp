@@ -5,12 +5,8 @@
 #define CALIB_DELAY_BETWEEN_SAMPLES 10
 
 uint16_t value = 0;
-uint16_t minValue = 4095;
-uint16_t maxValue = 0;
-uint16_t minDeadZone = 0;
-uint16_t maxDeadZone = 0;
-uint16_t adjustedMin = 0;
-uint16_t adjustedMax = 0;
+uint16_t minValue = 0;
+uint16_t maxValue = 4095;
 uint16_t percentage = 0;
 
 void calibrationWizard() {
@@ -25,11 +21,8 @@ void calibrationWizard() {
     Serial.println("Calibrating minimum position...");
     for (uint8_t i = 0; i < CALIB_SAMPLES; i++) {
         value = analogRead(ADC_PIN);
-        if (value < minValue) {
+        if (value > minValue) {
             minValue = value;
-        }
-        if (minValue + minDeadZone < value) {
-            minDeadZone = value - minValue;
         }
         delay(CALIB_DELAY_BETWEEN_SAMPLES);
     }
@@ -44,17 +37,12 @@ void calibrationWizard() {
     Serial.println("Calibrating maximum position...");
     for (uint8_t i = 0; i < CALIB_SAMPLES; i++) {
         value = analogRead(ADC_PIN);
-        if (value > maxValue) {
+        if (value < maxValue) {
             maxValue = value;
-        }
-        if (maxValue - maxDeadZone > value) {
-            maxDeadZone = maxValue - value;
         }
         delay(CALIB_DELAY_BETWEEN_SAMPLES);
     }
     Serial.println("Maximum position calibrated.");
-    adjustedMin = minValue + minDeadZone;
-    adjustedMax = maxValue - maxDeadZone;
     Serial.println("Calibration complete.");
 }
 
@@ -71,10 +59,10 @@ void loop() {
     // Read Hall Sensor value from ADC pin
     value = analogRead(ADC_PIN);
     // Calculate percentage value
-    if (adjustedMin >= adjustedMax) {
+    if (value <= minValue) {
         percentage = 0; // If no valid range, set percentage to 0
     } else {
-        percentage = map(value, adjustedMin, adjustedMax, 0, 100);
+        percentage = map(value, minValue, maxValue, 0, 100);
         // Ensure percentage is within bounds
         if (percentage < 0) {
             percentage = 0;
