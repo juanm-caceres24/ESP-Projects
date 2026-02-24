@@ -29,7 +29,7 @@ void calibrationWizard() {
         if (minValue + minDeadZone < value) {
             minDeadZone = value - minValue;
         }
-        delay(50);
+        delay(10);
     }
     Serial.println("Minimum position calibrated.");
     Serial.println("Please set the magnet in maximum position in 3 seconds...");
@@ -48,7 +48,7 @@ void calibrationWizard() {
         if (maxValue - maxDeadZone > value) {
             maxDeadZone = maxValue - value;
         }
-        delay(50);
+        delay(10);
     }
     Serial.println("Maximum position calibrated.");
     adjustedMin = minValue + minDeadZone;
