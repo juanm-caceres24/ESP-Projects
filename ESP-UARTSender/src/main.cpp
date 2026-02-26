@@ -1,27 +1,57 @@
-#include <HardwareSerial.h>
+#include <Arduino.h>
 
-#define UART_TX 17
-#define UART_RX 16
+#define UART_BAUD 115200
+#define START_BYTE 0xAA
+#define MSG_TYPE_BUTTON 0x01
+#define NUM_BUTTONS 2
+#define DEBOUNCE_DELAY 20
 
-HardwareSerial SerialUART(2);
+uint8_t button_pins[NUM_BUTTONS] = {4, 5};
+bool button_state[NUM_BUTTONS];
+bool last_button_state[NUM_BUTTONS];
+unsigned long last_debounce_time[NUM_BUTTONS];
+
+uint8_t calculate_CRC(uint8_t *data) {
+    uint8_t crc = 0;
+    for (int i = 0; i < 5; i++) {
+        crc ^= data[i];
+    }
+    return crc;
+}
+
+void send_button_event(uint8_t id, bool state) {
+    uint8_t packet[6];
+    packet[0] = START_BYTE;
+    packet[1] = MSG_TYPE_BUTTON;
+    packet[2] = id;
+    packet[3] = state ? 1 : 0;
+    packet[4] = 0;
+    packet[5] = calculate_CRC(packet);
+    Serial.write(packet, 6);
+}
 
 void setup() {
-    Serial.begin(115200);
-    while (!Serial) delay(10);
-    Serial.println("=== ESP32 UART Test ===");
-    SerialUART.begin(9600, SERIAL_8N1, UART_RX, UART_TX);
+    Serial.begin(UART_BAUD);
+    for (int i = 0; i < NUM_BUTTONS; i++) {
+        pinMode(button_pins[i], INPUT_PULLUP);
+        button_state[i] = false;
+        last_button_state[i] = false;
+        last_debounce_time[i] = 0;
+    }
 }
 
 void loop() {
-    if (Serial.available()) {
-        char c = Serial.read();
-        SerialUART.write(c);
-        Serial.print("Sended: ");
-        Serial.println(c);
-    }
-    if (SerialUART.available()) {
-        char c = SerialUART.read();
-        Serial.print("Received: ");
-        Serial.println(c);
+    for (uint8_t i = 0; i < NUM_BUTTONS; i++) {
+        bool reading = !digitalRead(button_pins[i]);
+        if (reading != last_button_state[i]) {
+            last_debounce_time[i] = millis();
+        }
+        if ((millis() - last_debounce_time[i]) > DEBOUNCE_DELAY) {
+            if (reading != button_state[i]) {
+                button_state[i] = reading;
+                send_button_event(i, button_state[i]);
+            }
+        }
+        last_button_state[i] = reading;
     }
 }
