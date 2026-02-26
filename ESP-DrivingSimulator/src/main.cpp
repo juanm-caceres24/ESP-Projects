@@ -69,7 +69,6 @@ void hall_init() {
 
 void hall_calibrate(HallSensor &sensor, const char* name) {
     uint16_t value;
-    Serial.println("=================================");
     Serial.print("Calibrating ");
     Serial.println(name);
     Serial.println("Set to MIN position in 3 seconds...");
