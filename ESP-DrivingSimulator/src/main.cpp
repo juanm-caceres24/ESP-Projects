@@ -1,97 +1,116 @@
 #include <Arduino.h>
+#include "driver/pcnt.h"
 
-// Pins
-#define ROTARY_ENCODER_A_PIN 12
-#define ROTARY_ENCODER_B_PIN 13
+#define ENCODER_PIN_A 4
+#define ENCODER_PIN_B 5
+#define PCNT_UNIT_USED PCNT_UNIT_0
 
-// Rotary encoder parameters
-#define ROTARY_ENCODER_INCREMENT 15 // Increment per detent (in grades 360 * 100)
+#define HALL_ACCEL_PIN 14
+#define HALL_BRAKE_PIN 13
+#define CALIB_SAMPLES 50
+#define CALIB_DELAY_BETWEEN_SAMPLES 10
 
-// Global variables
-uint8_t rotaryEncoderLastStates = 0b00; // Bit 0: A state, Bit 1: B state
-uint32_t rotaryEncoderPosition = 0; // Position in grades 360 * 100
-uint8_t updateEncoder = 0;
+struct HallSensor {
+    uint8_t pin;
+    uint16_t minValue;
+    uint16_t maxValue;
+};
 
-// Function prototypes
-void rotaryEncoder_ISR();
+HallSensor hallAccel = {HALL_ACCEL_PIN, 0, 4095};
+HallSensor hallBrake = {HALL_BRAKE_PIN, 0, 4095};
+
+void encoder_init() {
+    pcnt_config_t pcnt_config = {};
+    pcnt_config.pulse_gpio_num = ENCODER_PIN_A;
+    pcnt_config.ctrl_gpio_num  = ENCODER_PIN_B;
+    pcnt_config.channel        = PCNT_CHANNEL_0;
+    pcnt_config.unit           = PCNT_UNIT_USED;
+    pcnt_config.pos_mode       = PCNT_COUNT_INC;
+    pcnt_config.neg_mode       = PCNT_COUNT_DEC;
+    pcnt_config.lctrl_mode     = PCNT_MODE_REVERSE;
+    pcnt_config.hctrl_mode     = PCNT_MODE_KEEP;
+    pcnt_config.counter_h_lim  = 32767;
+    pcnt_config.counter_l_lim  = -32768;
+    pcnt_unit_config(&pcnt_config);
+    pcnt_counter_pause(PCNT_UNIT_USED);
+    pcnt_counter_clear(PCNT_UNIT_USED);
+    pcnt_counter_resume(PCNT_UNIT_USED);
+}
+
+int16_t encoder_getCount() {
+    int16_t count = 0;
+    pcnt_get_counter_value(PCNT_UNIT_USED, &count);
+    return count;
+}
+
+void encoder_reset() {
+    pcnt_counter_clear(PCNT_UNIT_USED);
+}
+
+void hall_init() {
+    analogReadResolution(12);
+    analogSetPinAttenuation(HALL_ACCEL_PIN, ADC_11db);
+    analogSetPinAttenuation(HALL_BRAKE_PIN, ADC_11db);
+    pinMode(HALL_ACCEL_PIN, INPUT);
+    pinMode(HALL_BRAKE_PIN, INPUT);
+}
+
+void hall_calibrate(HallSensor &sensor, const char* name) {
+    uint16_t value;
+    Serial.println("=================================");
+    Serial.print("Calibrating ");
+    Serial.println(name);
+    Serial.println("Set to MIN position in 3 seconds...");
+    delay(3000);
+    sensor.minValue = 0;
+    for (uint8_t i = 0; i < CALIB_SAMPLES; i++) {
+        value = analogRead(sensor.pin);
+        if (value > sensor.minValue) {
+            sensor.minValue = value;
+        }
+        delay(CALIB_DELAY_BETWEEN_SAMPLES);
+    }
+    Serial.print("Min calibrated: ");
+    Serial.println(sensor.minValue);
+    Serial.println("Set to MAX position in 3 seconds...");
+    delay(3000);
+    sensor.maxValue = 4095;
+    for (uint8_t i = 0; i < CALIB_SAMPLES; i++) {
+        value = analogRead(sensor.pin);
+        if (value < sensor.maxValue) {
+            sensor.maxValue = value;
+        }
+        delay(CALIB_DELAY_BETWEEN_SAMPLES);
+    }
+    Serial.print("Max calibrated: ");
+    Serial.println(sensor.maxValue);
+    Serial.println("Calibration complete.");
+}
+
+uint8_t hall_getPercentage(HallSensor &sensor) {
+    uint16_t raw = analogRead(sensor.pin);
+    if (raw <= sensor.minValue)
+        return 0;
+    if (raw >= sensor.maxValue)
+        return 100;
+    return map(raw, sensor.minValue, sensor.maxValue, 0, 100);
+}
 
 void setup() {
-    // Initialize serial communication at 115200 baud rate
     Serial.begin(115200);
-    Serial.println("ESP Driving Simulator Initialized");
-    // Initialize GPIO pins for rotary encoder
-    pinMode(ROTARY_ENCODER_A_PIN, INPUT); // A
-    pinMode(ROTARY_ENCODER_B_PIN, INPUT); // B
-    attachInterrupt(digitalPinToInterrupt(ROTARY_ENCODER_A_PIN), rotaryEncoder_ISR, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(ROTARY_ENCODER_B_PIN), rotaryEncoder_ISR, CHANGE);
+    encoder_init();
+    Serial.println("Encoder ready.");
+    hall_init();
+    Serial.println("Hall Calibration:");
+    hall_calibrate(hallAccel, "Accelerator");
+    hall_calibrate(hallBrake, "Brake");
+    Serial.println("Hall sensors ready.");
 }
 
 void loop() {
-    if (updateEncoder) {
-        Serial.print("Encoder Value: ");
-        Serial.println(rotaryEncoderPosition);
-        updateEncoder = 0;
-    }
-}
-
-void rotaryEncoder_ISR() {
-    // Combine states into a 2-bit value
-    uint8_t currentStates = (digitalRead(ROTARY_ENCODER_A_PIN) << 1) | digitalRead(ROTARY_ENCODER_B_PIN);
-    // Determine rotation direction
-    if (rotaryEncoderLastStates == 0b00) {
-        if (currentStates == 0b01) {
-            rotaryEncoderPosition += ROTARY_ENCODER_INCREMENT; // Clockwise
-            if (rotaryEncoderPosition >= 36000) {
-                rotaryEncoderPosition = 0; // Wrap around
-            }
-        } else if (currentStates == 0b10) {
-            if (rotaryEncoderPosition == 0) {
-                rotaryEncoderPosition = 35985; // Wrap around
-            } else {
-                rotaryEncoderPosition -= ROTARY_ENCODER_INCREMENT; // Counter-clockwise
-            }
-        }
-    } else if (rotaryEncoderLastStates == 0b01) {
-        if (currentStates == 0b11) {
-            rotaryEncoderPosition += ROTARY_ENCODER_INCREMENT; // Clockwise
-            if (rotaryEncoderPosition >= 36000) {
-                rotaryEncoderPosition = 0; // Wrap around
-            }
-        } else if (currentStates == 0b00) {
-            if (rotaryEncoderPosition == 0) {
-                rotaryEncoderPosition = 35985; // Wrap around
-            } else {
-                rotaryEncoderPosition -= ROTARY_ENCODER_INCREMENT; // Counter-clockwise
-            }
-        }
-    } else if (rotaryEncoderLastStates == 0b11) {
-        if (currentStates == 0b10) {
-            rotaryEncoderPosition += ROTARY_ENCODER_INCREMENT; // Clockwise
-            if (rotaryEncoderPosition >= 36000) {
-                rotaryEncoderPosition = 0; // Wrap around
-            }
-        } else if (currentStates == 0b01) {
-            if (rotaryEncoderPosition == 0) {
-                rotaryEncoderPosition = 35985; // Wrap around
-            } else {
-                rotaryEncoderPosition -= ROTARY_ENCODER_INCREMENT; // Counter-clockwise
-            }
-        }
-    } else if (rotaryEncoderLastStates == 0b10) {
-        if (currentStates == 0b00) {
-            rotaryEncoderPosition += ROTARY_ENCODER_INCREMENT; // Clockwise
-            if (rotaryEncoderPosition >= 36000) {
-                rotaryEncoderPosition = 0; // Wrap around
-            }
-        } else if (currentStates == 0b11) {
-            if (rotaryEncoderPosition == 0) {
-                rotaryEncoderPosition = 35985; // Wrap around
-            } else {
-                rotaryEncoderPosition -= ROTARY_ENCODER_INCREMENT; // Counter-clockwise
-            }
-        }
-    }
-    // Update last states and set update flag
-    rotaryEncoderLastStates = currentStates;
-    updateEncoder = 1;
+    int16_t position = encoder_getCount();
+    uint8_t accel = hall_getPercentage(hallAccel);
+    uint8_t brake = hall_getPercentage(hallBrake);
+    Serial.println("Encoder position: " + String(position) + " | Accelerator: " + String(accel) + "% | Brake: " + String(brake) + "%");
+    delay(100);
 }
