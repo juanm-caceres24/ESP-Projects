@@ -55,6 +55,7 @@ void encoder_init() {
 int16_t encoder_get_count() {
     int16_t count = 0;
     pcnt_get_counter_value(PCNT_UNIT_USED, &count);
+    count = constrain(count, -3200, 3200);
     return count;
 }
 
@@ -192,8 +193,8 @@ void setup() {
 
 void loop() {
     handle_UART();
-    int8_t joyX = map(encoder_get_count(), 3000, -3000, -128, 127);
-    int8_t joyY = map(hall_get_value(hall_accel), 0, 127, 127, -128);
+    int8_t joyX = map(encoder_get_count(), 13500, -13500, -512, 511);
+    int8_t joyY = map(hall_get_value(hall_accel), 0, 127, -128, 127);
     int8_t joyZ = map(hall_get_value(hall_brake), 0, 127, -128, 127);
     gamepad.send(
         joyX,
