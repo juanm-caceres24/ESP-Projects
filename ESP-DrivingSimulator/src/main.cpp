@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include "driver/pcnt.h"
+#include "USB.h"
+#include "USBHIDGamepad.h"
 
 #define ENCODER_PIN_A 4
 #define ENCODER_PIN_B 5
@@ -25,11 +27,12 @@ struct HallSensor {
     uint16_t max_value;
 };
 
+USBHIDGamepad gamepad;
 HallSensor hall_accel = {HALL_ACCEL_PIN, 0, 4095};
 HallSensor hall_brake = {HALL_BRAKE_PIN, 0, 4095};
-
 uint8_t rxBuffer[PACKET_SIZE];
 uint8_t rxIndex = 0;
+uint32_t hid_buttons = 0;
 
 void encoder_init() {
     pcnt_config_t pcnt_config = {};
@@ -98,13 +101,10 @@ void hall_calibrate(HallSensor &sensor, const char* name) {
     Serial.println("Calibration complete.");
 }
 
-uint8_t hall_get_percentage(HallSensor &sensor) {
+uint8_t hall_get_value(HallSensor &sensor) {
     uint16_t raw = analogRead(sensor.pin);
-    if (raw <= sensor.min_value)
-        return 0;
-    if (raw >= sensor.max_value)
-        return 100;
-    return map(raw, sensor.min_value, sensor.max_value, 0, 100);
+    raw = constrain(raw, sensor.min_value, sensor.max_value);
+    return map(raw, sensor.min_value, sensor.max_value, 0, 127);
 }
 
 uint8_t calculate_CRC(uint8_t *data) {
@@ -121,10 +121,18 @@ void process_packet(uint8_t *packet) {
     uint16_t value = packet[3] | (packet[4] << 8);
     switch (type) {
         case MSG_TYPE_BUTTON:
-            Serial.print("Button ");
-            Serial.print(id);
-            Serial.print(" -> ");
-            Serial.println(value ? "Pressed" : "Released");
+            if (id == 0) {
+                if (value)
+                    hid_buttons |= (1 << BUTTON_A);
+                else
+                    hid_buttons &= ~(1 << BUTTON_A);
+            }
+            if (id == 1) {
+                if (value)
+                    hid_buttons |= (1 << BUTTON_B);
+                else
+                    hid_buttons &= ~(1 << BUTTON_B);
+            }
             break;
         case MSG_TYPE_ENCODER:
             Serial.print("Encoder ");
@@ -169,6 +177,8 @@ void handle_UART() {
 }
 
 void setup() {
+    USB.begin();
+    gamepad.begin();
     Serial.begin(115200);
     Serial1.begin(UART_BAUD, SERIAL_8N1, RXD1, TXD1);
     encoder_init();
@@ -181,10 +191,19 @@ void setup() {
 }
 
 void loop() {
-    int16_t position = encoder_get_count();
-    uint8_t accel = hall_get_percentage(hall_accel);
-    uint8_t brake = hall_get_percentage(hall_brake);
     handle_UART();
-    Serial.println("Encoder position: " + String(position) + " | Accelerator: " + String(accel) + "% | Brake: " + String(brake) + "%");
-    delay(100);
+    int8_t joyX = map(encoder_get_count(), 3000, -3000, -128, 127);
+    int8_t joyY = map(hall_get_value(hall_accel), 0, 127, 127, -128);
+    int8_t joyZ = map(hall_get_value(hall_brake), 0, 127, -128, 127);
+    gamepad.send(
+        joyX,
+        joyY,
+        joyZ,
+        0,
+        0,
+        0,
+        HAT_CENTER,
+        hid_buttons
+    );
+    delay(5);
 }
