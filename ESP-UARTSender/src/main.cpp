@@ -8,7 +8,7 @@
 #define NUM_BUTTONS 2
 #define DEBOUNCE_DELAY 20
 
-uint8_t button_pins[NUM_BUTTONS] = {4, 5};
+uint8_t button_pins[NUM_BUTTONS] = {13, 14};
 bool button_state[NUM_BUTTONS];
 bool last_button_state[NUM_BUTTONS];
 unsigned long last_debounce_time[NUM_BUTTONS];
@@ -44,7 +44,7 @@ void setup() {
 
 void loop() {
     for (uint8_t i = 0; i < NUM_BUTTONS; i++) {
-        bool reading = !digitalRead(button_pins[i]);
+        bool reading = digitalRead(button_pins[i]);
         if (reading != last_button_state[i]) {
             last_debounce_time[i] = millis();
         }
