@@ -1,5 +1,7 @@
 #include <Arduino.h>
 
+#define RXD1_PIN 16
+#define TXD1_PIN 17
 #define UART_BAUD 115200
 #define START_BYTE 0xAA
 #define MSG_TYPE_BUTTON 0x01
@@ -27,11 +29,11 @@ void send_button_event(uint8_t id, bool state) {
     packet[3] = state ? 1 : 0;
     packet[4] = 0;
     packet[5] = calculate_CRC(packet);
-    Serial.write(packet, 6);
+    Serial1.write(packet, 6);
 }
 
 void setup() {
-    Serial.begin(UART_BAUD);
+    Serial1.begin(UART_BAUD, SERIAL_8N1, RXD1_PIN, TXD1_PIN);
     for (int i = 0; i < NUM_BUTTONS; i++) {
         pinMode(button_pins[i], INPUT_PULLUP);
         button_state[i] = false;

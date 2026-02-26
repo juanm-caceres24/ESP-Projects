@@ -10,6 +10,15 @@
 #define CALIB_SAMPLES 50
 #define CALIB_DELAY_BETWEEN_SAMPLES 10
 
+#define RXD1 18
+#define TXD1 17
+#define UART_BAUD 115200
+#define START_BYTE 0xAA
+#define PACKET_SIZE 6
+#define MSG_TYPE_BUTTON 0x01
+#define MSG_TYPE_ENCODER 0x02
+#define MSG_TYPE_ANALOG 0x03
+
 struct HallSensor {
     uint8_t pin;
     uint16_t min_value;
@@ -18,6 +27,9 @@ struct HallSensor {
 
 HallSensor hall_accel = {HALL_ACCEL_PIN, 0, 4095};
 HallSensor hall_brake = {HALL_BRAKE_PIN, 0, 4095};
+
+uint8_t rxBuffer[PACKET_SIZE];
+uint8_t rxIndex = 0;
 
 void encoder_init() {
     pcnt_config_t pcnt_config = {};
@@ -96,8 +108,70 @@ uint8_t hall_get_percentage(HallSensor &sensor) {
     return map(raw, sensor.min_value, sensor.max_value, 0, 100);
 }
 
+uint8_t calculate_CRC(uint8_t *data) {
+    uint8_t crc = 0;
+    for (int i = 0; i < 5; i++) {
+        crc ^= data[i];
+    }
+    return crc;
+}
+
+void process_packet(uint8_t *packet) {
+    uint8_t type = packet[1];
+    uint8_t id = packet[2];
+    uint16_t value = packet[3] | (packet[4] << 8);
+    switch (type) {
+        case MSG_TYPE_BUTTON:
+            Serial.print("Button ");
+            Serial.print(id);
+            Serial.print(" -> ");
+            Serial.println(value ? "Pressed" : "Released");
+            break;
+        case MSG_TYPE_ENCODER:
+            Serial.print("Encoder ");
+            Serial.print(id);
+            Serial.print(" -> ");
+            Serial.println(value);
+            break;
+        case MSG_TYPE_ANALOG:
+            Serial.print("Analog ");
+            Serial.print(id);
+            Serial.print(" -> ");
+            Serial.println(value);
+            break;
+        default:
+            Serial.println("Unknown packet type");
+            break;
+    }
+}
+
+void handle_UART() {
+    while (Serial1.available()) {
+        uint8_t byteReceived = Serial1.read();
+        if (rxIndex == 0) {
+            if (byteReceived == START_BYTE) {
+                rxBuffer[rxIndex++] = byteReceived;
+            }
+        }
+        else {
+            rxBuffer[rxIndex++] = byteReceived;
+            if (rxIndex >= PACKET_SIZE) {
+                uint8_t receivedCRC = rxBuffer[5];
+                uint8_t calculatedCRC = calculate_CRC(rxBuffer);
+                if (receivedCRC == calculatedCRC) {
+                    process_packet(rxBuffer);
+                } else {
+                    Serial.println("CRC error");
+                }
+                rxIndex = 0;
+            }
+        }
+    }
+}
+
 void setup() {
     Serial.begin(115200);
+    Serial1.begin(UART_BAUD, SERIAL_8N1, RXD1, TXD1);
     encoder_init();
     Serial.println("Encoder ready.");
     hall_init();
@@ -111,6 +185,7 @@ void loop() {
     int16_t position = encoder_get_count();
     uint8_t accel = hall_get_percentage(hall_accel);
     uint8_t brake = hall_get_percentage(hall_brake);
+    handle_UART();
     Serial.println("Encoder position: " + String(position) + " | Accelerator: " + String(accel) + "% | Brake: " + String(brake) + "%");
     delay(100);
 }
