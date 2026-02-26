@@ -12,12 +12,12 @@
 
 struct HallSensor {
     uint8_t pin;
-    uint16_t minValue;
-    uint16_t maxValue;
+    uint16_t min_value;
+    uint16_t max_value;
 };
 
-HallSensor hallAccel = {HALL_ACCEL_PIN, 0, 4095};
-HallSensor hallBrake = {HALL_BRAKE_PIN, 0, 4095};
+HallSensor hall_accel = {HALL_ACCEL_PIN, 0, 4095};
+HallSensor hall_brake = {HALL_BRAKE_PIN, 0, 4095};
 
 void encoder_init() {
     pcnt_config_t pcnt_config = {};
@@ -37,7 +37,7 @@ void encoder_init() {
     pcnt_counter_resume(PCNT_UNIT_USED);
 }
 
-int16_t encoder_getCount() {
+int16_t encoder_get_count() {
     int16_t count = 0;
     pcnt_get_counter_value(PCNT_UNIT_USED, &count);
     return count;
@@ -62,38 +62,38 @@ void hall_calibrate(HallSensor &sensor, const char* name) {
     Serial.println(name);
     Serial.println("Set to MIN position in 3 seconds...");
     delay(3000);
-    sensor.minValue = 0;
+    sensor.min_value = 0;
     for (uint8_t i = 0; i < CALIB_SAMPLES; i++) {
         value = analogRead(sensor.pin);
-        if (value > sensor.minValue) {
-            sensor.minValue = value;
+        if (value > sensor.min_value) {
+            sensor.min_value = value;
         }
         delay(CALIB_DELAY_BETWEEN_SAMPLES);
     }
     Serial.print("Min calibrated: ");
-    Serial.println(sensor.minValue);
+    Serial.println(sensor.min_value);
     Serial.println("Set to MAX position in 3 seconds...");
     delay(3000);
-    sensor.maxValue = 4095;
+    sensor.max_value = 4095;
     for (uint8_t i = 0; i < CALIB_SAMPLES; i++) {
         value = analogRead(sensor.pin);
-        if (value < sensor.maxValue) {
-            sensor.maxValue = value;
+        if (value < sensor.max_value) {
+            sensor.max_value = value;
         }
         delay(CALIB_DELAY_BETWEEN_SAMPLES);
     }
     Serial.print("Max calibrated: ");
-    Serial.println(sensor.maxValue);
+    Serial.println(sensor.max_value);
     Serial.println("Calibration complete.");
 }
 
-uint8_t hall_getPercentage(HallSensor &sensor) {
+uint8_t hall_get_percentage(HallSensor &sensor) {
     uint16_t raw = analogRead(sensor.pin);
-    if (raw <= sensor.minValue)
+    if (raw <= sensor.min_value)
         return 0;
-    if (raw >= sensor.maxValue)
+    if (raw >= sensor.max_value)
         return 100;
-    return map(raw, sensor.minValue, sensor.maxValue, 0, 100);
+    return map(raw, sensor.min_value, sensor.max_value, 0, 100);
 }
 
 void setup() {
@@ -102,15 +102,15 @@ void setup() {
     Serial.println("Encoder ready.");
     hall_init();
     Serial.println("Hall Calibration:");
-    hall_calibrate(hallAccel, "Accelerator");
-    hall_calibrate(hallBrake, "Brake");
+    hall_calibrate(hall_accel, "Accelerator");
+    hall_calibrate(hall_brake, "Brake");
     Serial.println("Hall sensors ready.");
 }
 
 void loop() {
-    int16_t position = encoder_getCount();
-    uint8_t accel = hall_getPercentage(hallAccel);
-    uint8_t brake = hall_getPercentage(hallBrake);
+    int16_t position = encoder_get_count();
+    uint8_t accel = hall_get_percentage(hall_accel);
+    uint8_t brake = hall_get_percentage(hall_brake);
     Serial.println("Encoder position: " + String(position) + " | Accelerator: " + String(accel) + "% | Brake: " + String(brake) + "%");
     delay(100);
 }
