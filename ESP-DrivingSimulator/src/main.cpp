@@ -6,6 +6,7 @@
 #define ENCODER_PIN_A 4
 #define ENCODER_PIN_B 5
 #define PCNT_UNIT_USED PCNT_UNIT_0
+#define ENCODER_MAX_COUNT 3375
 
 #define HALL_ACCEL_PIN 14
 #define HALL_BRAKE_PIN 13
@@ -55,7 +56,7 @@ void encoder_init() {
 int16_t encoder_get_count() {
     int16_t count = 0;
     pcnt_get_counter_value(PCNT_UNIT_USED, &count);
-    count = constrain(count, -3200, 3200);
+    count = constrain(count, -ENCODER_MAX_COUNT, ENCODER_MAX_COUNT);
     return count;
 }
 
@@ -193,7 +194,7 @@ void setup() {
 
 void loop() {
     handle_UART();
-    int8_t joyX = map(encoder_get_count(), 13500, -13500, -512, 511);
+    int8_t joyX = map(encoder_get_count(), ENCODER_MAX_COUNT, -ENCODER_MAX_COUNT, -128, 127);
     int8_t joyY = map(hall_get_value(hall_accel), 0, 127, -128, 127);
     int8_t joyZ = map(hall_get_value(hall_brake), 0, 127, -128, 127);
     gamepad.send(
@@ -206,5 +207,13 @@ void loop() {
         HAT_CENTER,
         hid_buttons
     );
+    Serial.print("Joystick X: (");
+    Serial.print(encoder_get_count());
+    Serial.print(") ");
+    Serial.print(joyX);
+    Serial.print(" Y: ");
+    Serial.print(joyY);
+    Serial.print(" Z: ");
+    Serial.println(joyZ);
     delay(5);
 }
