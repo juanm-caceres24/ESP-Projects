@@ -47,10 +47,20 @@ static const uint8_t report_descriptor[] = {
     0x95, 0x20,
     0x81, 0x02,
 
+    // Simple vendor output report channel for future force commands.
+    0x06, 0x00, 0xFF,
+    0x09, 0x01,
+    0x85, 0x10,
+    0x15, 0x00,
+    0x26, 0xFF, 0x00,
+    0x75, 0x08,
+    0x95, 0x08,
+    0x91, 0x02,
+
     0xC0
 };
 
-USBHIDGamepad16::USBHIDGamepad16(): hid(), _x(0), _y(0), _z(0), _rz(0), _rx(0), _ry(0), _hat(0), _buttons(0) {
+USBHIDGamepad16::USBHIDGamepad16(): hid(), _outputCallback(nullptr), _getFeatureCallback(nullptr), _setFeatureCallback(nullptr), _x(0), _y(0), _z(0), _rz(0), _rx(0), _ry(0), _hat(0), _buttons(0) {
     static bool initialized = false;
     if (!initialized) {
         initialized = true;
@@ -143,6 +153,37 @@ bool USBHIDGamepad16::send(int16_t x, int16_t y, int16_t z, int16_t rz, int16_t 
     _hat = hat;
     _buttons = buttons;
     return write();
+}
+
+void USBHIDGamepad16::setOutputCallback(void (*callback)(uint8_t report_id, const uint8_t* buffer, uint16_t len)) {
+    _outputCallback = callback;
+}
+
+void USBHIDGamepad16::setGetFeatureCallback(uint16_t (*callback)(uint8_t report_id, uint8_t* buffer, uint16_t len)) {
+    _getFeatureCallback = callback;
+}
+
+void USBHIDGamepad16::setSetFeatureCallback(void (*callback)(uint8_t report_id, const uint8_t* buffer, uint16_t len)) {
+    _setFeatureCallback = callback;
+}
+
+uint16_t USBHIDGamepad16::_onGetFeature(uint8_t report_id, uint8_t* buffer, uint16_t len) {
+    if (_getFeatureCallback) {
+        return _getFeatureCallback(report_id, buffer, len);
+    }
+    return 0;
+}
+
+void USBHIDGamepad16::_onSetFeature(uint8_t report_id, const uint8_t* buffer, uint16_t len) {
+    if (_setFeatureCallback) {
+        _setFeatureCallback(report_id, buffer, len);
+    }
+}
+
+void USBHIDGamepad16::_onOutput(uint8_t report_id, const uint8_t* buffer, uint16_t len) {
+    if (_outputCallback) {
+        _outputCallback(report_id, buffer, len);
+    }
 }
 
 #endif

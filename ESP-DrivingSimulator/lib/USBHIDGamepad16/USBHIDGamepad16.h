@@ -49,6 +49,9 @@ typedef struct __attribute__((packed)) {
 class USBHIDGamepad16: public USBHIDDevice {
 private:
     USBHID hid;
+    void (*_outputCallback)(uint8_t report_id, const uint8_t* buffer, uint16_t len);
+    uint16_t (*_getFeatureCallback)(uint8_t report_id, uint8_t* buffer, uint16_t len);
+    void (*_setFeatureCallback)(uint8_t report_id, const uint8_t* buffer, uint16_t len);
     int16_t _x;
     int16_t _y;
     int16_t _z;
@@ -76,8 +79,14 @@ public:
     bool releaseButton(uint8_t button);
 
     bool send(int16_t x, int16_t y, int16_t z, int16_t rz, int16_t rx, int16_t ry, uint8_t hat, uint32_t buttons);
+    void setOutputCallback(void (*callback)(uint8_t report_id, const uint8_t* buffer, uint16_t len));
+    void setGetFeatureCallback(uint16_t (*callback)(uint8_t report_id, uint8_t* buffer, uint16_t len));
+    void setSetFeatureCallback(void (*callback)(uint8_t report_id, const uint8_t* buffer, uint16_t len));
 
     uint16_t _onGetDescriptor(uint8_t* buffer);
+    uint16_t _onGetFeature(uint8_t report_id, uint8_t* buffer, uint16_t len);
+    void _onSetFeature(uint8_t report_id, const uint8_t* buffer, uint16_t len);
+    void _onOutput(uint8_t report_id, const uint8_t* buffer, uint16_t len);
 };
 
 #endif
