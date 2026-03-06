@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "driver/pcnt.h"
 #include "USB.h"
-#include "USBHIDGamepad.h"
+#include "USBHIDGamepad16.h"
 
 #define ENCODER_PIN_A 4
 #define ENCODER_PIN_B 5
@@ -28,7 +28,7 @@ struct HallSensor {
     uint16_t max_value;
 };
 
-USBHIDGamepad gamepad;
+USBHIDGamepad16 gamepad;
 HallSensor hall_accel = {HALL_ACCEL_PIN, 0, 4095};
 HallSensor hall_brake = {HALL_BRAKE_PIN, 0, 4095};
 uint8_t rxBuffer[PACKET_SIZE];
@@ -103,10 +103,10 @@ void hall_calibrate(HallSensor &sensor, const char* name) {
     Serial.println("Calibration complete.");
 }
 
-uint8_t hall_get_value(HallSensor &sensor) {
+uint16_t hall_get_value(HallSensor &sensor) {
     uint16_t raw = analogRead(sensor.pin);
     raw = constrain(raw, sensor.min_value, sensor.max_value);
-    return map(raw, sensor.min_value, sensor.max_value, 0, 127);
+    return map(raw, sensor.min_value, sensor.max_value, 0, 65535);
 }
 
 uint8_t calculate_CRC(uint8_t *data) {
@@ -194,9 +194,9 @@ void setup() {
 
 void loop() {
     handle_UART();
-    int8_t joyX = map(encoder_get_count(), ENCODER_MAX_COUNT, -ENCODER_MAX_COUNT, -128, 127);
-    int8_t joyY = map(hall_get_value(hall_accel), 0, 127, -128, 127);
-    int8_t joyZ = map(hall_get_value(hall_brake), 0, 127, -128, 127);
+    int16_t joyX = map(encoder_get_count(), ENCODER_MAX_COUNT, -ENCODER_MAX_COUNT, -32768, 32767);
+    int16_t joyY = map(hall_get_value(hall_accel), 0, 65535, -32768, 32767);
+    int16_t joyZ = map(hall_get_value(hall_brake), 0, 65535, -32768, 32767);
     gamepad.send(
         joyX,
         joyY,
