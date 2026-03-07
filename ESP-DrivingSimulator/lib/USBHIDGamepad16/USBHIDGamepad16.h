@@ -79,6 +79,7 @@ public:
     bool releaseButton(uint8_t button);
 
     bool send(int16_t x, int16_t y, int16_t z, int16_t rz, int16_t rx, int16_t ry, uint8_t hat, uint32_t buttons);
+    bool sendRawReport(uint8_t report_id, const void* data, uint8_t len);
     void setOutputCallback(void (*callback)(uint8_t report_id, const uint8_t* buffer, uint16_t len));
     void setGetFeatureCallback(uint16_t (*callback)(uint8_t report_id, uint8_t* buffer, uint16_t len));
     void setSetFeatureCallback(void (*callback)(uint8_t report_id, const uint8_t* buffer, uint16_t len));
