@@ -37,7 +37,7 @@
 #define BTS_PWM_MAX ((1 << BTS_PWM_RES_BITS) - 1) // Maximum PWM value based on resolution bits.
 
 // Force Feedback (FFB) settings.
-#define FFB_MAX_VAL 1024 // Absolute maximum FFB value (full torque).
+#define FFB_ABS_MAX_VAL 1000 // Absolute maximum FFB value (full torque).
 #define FFB_DEADZONE 5 // Command values with absolute value below this will be considered zero to prevent motor from trying to compensate for small non-zero values.
 #define FFB_RID_VENDOR_TORQUE 0x20 // Report ID for vendor-specific torque commands. This is an arbitrary value chosen for this project.
 
@@ -49,7 +49,7 @@
 
 // Position PID controller settings for the motor self-test.
 #define MOTOR_SELF_TEST_TORQUE_LIMIT 300 // Maximum torque value during the self-test.
-#define MOTOR_SELF_TEST_POS_TOL 400 // Position tolerance in [encoder counts] for the self-test to consider the position reached.
+#define MOTOR_SELF_TEST_POS_TOL 60 // Position tolerance in [encoder counts] for the self-test to consider the position reached.
 #define MOTOR_SELF_TEST_HOLD_TIME_MS 500 // Time in [ms] to hold the position during the self-test once it's reached.
 #define MOTOR_SELF_TEST_TIMEOUT_MS 5000 // Timeout for the self-test in milliseconds.
 
@@ -285,7 +285,7 @@ int16_t get_pos_PID(int32_t target_position) {
         ffb_position_derivative = 0.0f;
     }
     ffb_last_position_error = ffb_position_error;
-    return constrain(FFB_POS_KP * ffb_position_error + FFB_POS_KI * ffb_position_integral + FFB_POS_KD * ffb_position_derivative, -FFB_MAX_VAL, FFB_MAX_VAL);
+    return constrain(FFB_POS_KP * ffb_position_error + FFB_POS_KI * ffb_position_integral + FFB_POS_KD * ffb_position_derivative, -FFB_ABS_MAX_VAL, FFB_ABS_MAX_VAL);
 }
 
 void reset_position_pid_state() {
@@ -317,11 +317,11 @@ void motor_init() {
 }
 
 void set_motor_torque(int16_t torque_val) {
-    torque_val = constrain(torque_val, -FFB_MAX_VAL, FFB_MAX_VAL);
+    torque_val = constrain(torque_val, -FFB_ABS_MAX_VAL, FFB_ABS_MAX_VAL);
     // Scale the FFB value by the device gain (0-255) to get the actual torque value to be applied.
     int32_t scaled = (int32_t)torque_val * ffb_device_gain / 255;
     // Map the absolute value of the scaled FFB value to a PWM value
-    int pwm = map(abs((int)scaled), 0, FFB_MAX_VAL, 0, BTS_PWM_MAX);
+    int pwm = map(abs((int)scaled), 0, FFB_ABS_MAX_VAL, 0, BTS_PWM_MAX);
     // Apply deadzone to prevent motor from trying to compensate for small non-zero values that could be caused by noise or minor command fluctuations.
     if (pwm < FFB_DEADZONE) {
         pwm = 0;
@@ -443,7 +443,7 @@ void on_hid_output_report(uint8_t report_id, const uint8_t* buffer, uint16_t len
     // Payload format: int16 torque (LE), uint8 gain, then padding.
     int16_t torque = (int16_t)((uint16_t)buffer[0] | ((uint16_t)buffer[1] << 8)); // Bits 0-15: torque value in little-endian format. This allows representing values from -32768 to 32767, which we will then constrain to our defined FFB_MAX_VAL range.
     uint8_t gain = buffer[2]; // Bits 16-23: device gain (0-255) to scale the torque value for different devices with different torque capabilities.
-    ffb_torque_value = constrain(torque, -FFB_MAX_VAL, FFB_MAX_VAL);
+    ffb_torque_value = constrain(torque, -FFB_ABS_MAX_VAL, FFB_ABS_MAX_VAL);
     ffb_device_gain = gain;
     ffb_last_cmd_ms = millis();
 }

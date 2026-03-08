@@ -1,12 +1,9 @@
 #include "USBHID.h"
-
 #if CONFIG_TINYUSB_HID_ENABLED
-
 #include "USBHIDGamepad16.h"
 
-// Clean stable descriptor:
-// - 16-bit axes + hat + 32 buttons
-// - Optional vendor output report (RID 0x20) for host bridge torque commands
+// 16-bit axes + hat + 32 buttons
+// Optional vendor output report (RID 0x20) for host bridge torque commands
 static const uint8_t report_descriptor_gamepad16[] = {
     0x05, 0x01,
     0x09, 0x05,
@@ -63,19 +60,19 @@ static const uint8_t report_descriptor_gamepad16[] = {
     0xC0
 };
 
-USBHIDGamepad16::USBHIDGamepad16()
-    : hid(),
-      _outputCallback(nullptr),
-      _getFeatureCallback(nullptr),
-      _setFeatureCallback(nullptr),
-      _x(0),
-      _y(0),
-      _z(0),
-      _rz(0),
-      _rx(0),
-      _ry(0),
-      _hat(0),
-      _buttons(0) {
+USBHIDGamepad16::USBHIDGamepad16():
+        hid(),
+        _outputCallback(nullptr),
+        _getFeatureCallback(nullptr),
+        _setFeatureCallback(nullptr),
+        _x(0),
+        _y(0),
+        _z(0),
+        _rz(0),
+        _rx(0),
+        _ry(0),
+        _hat(0),
+        _buttons(0) {
     static bool initialized = false;
     if (!initialized) {
         initialized = true;
