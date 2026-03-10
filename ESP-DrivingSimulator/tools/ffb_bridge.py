@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import math
 import signal
 import sys
 import threading
@@ -63,6 +64,21 @@ class FFB_EFF_OP(ctypes.Structure):
     ]
 
 
+class FFB_EFF_REPORT(ctypes.Structure):
+    _fields_ = [
+        ("EffectBlockIndex", ctypes.c_ubyte),
+        ("EffectType", ctypes.c_int),
+        ("Duration", ctypes.c_uint16),
+        ("TrigerRpt", ctypes.c_uint16),
+        ("SamplePrd", ctypes.c_uint16),
+        ("Gain", ctypes.c_ubyte),
+        ("TrigerBtn", ctypes.c_ubyte),
+        ("Polar", ctypes.c_bool),
+        ("Direction", ctypes.c_ubyte),
+        ("DirY", ctypes.c_ubyte),
+    ]
+
+
 @dataclass
 class AxisRange:
     min_val: int
@@ -73,7 +89,9 @@ class TorqueState:
     def __init__(self, max_torque: int) -> None:
         self.max_torque = max_torque
         self.device_gain = 255
-        self.constant_magnitude = 0  # -10000..10000
+        self._effect_x_scale: dict[int, float] = {}
+        self._effect_magnitude: dict[int, int] = {}
+        self._effect_active: dict[int, bool] = {}
         self._lock = threading.Lock()
 
     def set_device_gain(self, gain: int) -> None:
@@ -81,32 +99,96 @@ class TorqueState:
             self.device_gain = max(0, min(255, int(gain)))
 
     def set_constant(self, magnitude: int) -> None:
+        self.set_constant_for_block(0, magnitude)
+
+    def set_effect_direction_polar(self, block_index: int, dir_byte: int) -> None:
+        # vJoy docs: 0..255 -> 0..360 deg. X axis is cosine component.
+        angle_deg = (int(dir_byte) & 0xFF) * (360.0 / 255.0)
+        x_scale = math.cos(math.radians(angle_deg))
         with self._lock:
-            self.constant_magnitude = max(-10000, min(10000, int(magnitude)))
+            self._effect_x_scale[int(block_index)] = x_scale
+
+    def set_effect_direction_cartesian_x(self, block_index: int, dir_x_byte: int) -> None:
+        raw = int(dir_x_byte) & 0xFF
+        signed = raw - 256 if raw >= 128 else raw
+        x_scale = max(-1.0, min(1.0, signed / 127.0 if signed != -128 else -1.0))
+        with self._lock:
+            self._effect_x_scale[int(block_index)] = x_scale
+
+    def set_constant_for_block(self, block_index: int, magnitude: int) -> None:
+        with self._lock:
+            self._effect_magnitude[int(block_index)] = max(-10000, min(10000, int(magnitude)))
+            self._effect_active[int(block_index)] = True
+
+    def stop_effect_block(self, block_index: int) -> None:
+        with self._lock:
+            self._effect_active[int(block_index)] = False
+
+    def snapshot(self) -> tuple[int, dict[int, int], dict[int, float], dict[int, bool]]:
+        with self._lock:
+            return (
+                int(self.device_gain),
+                dict(self._effect_magnitude),
+                dict(self._effect_x_scale),
+                dict(self._effect_active),
+            )
 
     def stop_effects(self) -> None:
         with self._lock:
-            self.constant_magnitude = 0
+            self._effect_active.clear()
+            self._effect_magnitude.clear()
+            self._effect_x_scale.clear()
 
     def compute_torque(self) -> int:
         with self._lock:
-            scaled = (self.constant_magnitude / 10000.0) * self.max_torque
+            summed = 0.0
+            for block, mag in self._effect_magnitude.items():
+                if not self._effect_active.get(block, False):
+                    continue
+                x_scale = self._effect_x_scale.get(block, 1.0)
+                summed += (mag / 10000.0) * x_scale
+
+            # Keep total effect bounded before max_torque scaling.
+            summed = max(-1.0, min(1.0, summed))
+            scaled = summed * self.max_torque
             scaled *= self.device_gain / 255.0
         torque = int(round(scaled))
+
+        # Invert output sign to match this wheel's motor/driver direction.
+        torque = -torque
         return max(-self.max_torque, min(self.max_torque, torque))
 
 
 class VJoyBridge:
-    def __init__(self, dll_path: str | None, vjoy_id: int, torque_state: TorqueState) -> None:
+    def __init__(
+        self,
+        dll_path: str | None,
+        vjoy_id: int,
+        torque_state: TorqueState,
+        debug_ffb: bool = False,
+        debug_print_interval: float = 0.05,
+    ) -> None:
         self.vjoy_id = vjoy_id
         self.torque_state = torque_state
+        self.debug_ffb = debug_ffb
+        self.debug_print_interval = max(0.0, float(debug_print_interval))
+        self._last_ffb_debug_ts = 0.0
         self.dll = self._load_dll(dll_path)
         self._setup_prototypes()
         self._ffb_cb_ref = None
         self.axis_ranges: dict[int, AxisRange] = {}
 
+    def _log_ffb(self, msg: str) -> None:
+        if not self.debug_ffb:
+            return
+        now = time.monotonic()
+        if (now - self._last_ffb_debug_ts) < self.debug_print_interval:
+            return
+        self._last_ffb_debug_ts = now
+        print(f"[FFB] {msg}", flush=True)
+
     @staticmethod
-    def _load_dll(explicit_path: str | None) -> ctypes.WinDLL:
+    def _load_dll(explicit_path: str | None) -> ctypes.CDLL:
         candidates = []
         if explicit_path:
             candidates.append(explicit_path)
@@ -120,10 +202,26 @@ class VJoyBridge:
 
         for path in candidates:
             try:
-                return ctypes.WinDLL(path)
+                # vJoyInterface exports are declared as __cdecl.
+                return ctypes.CDLL(path)
             except OSError:
                 continue
         raise RuntimeError("No se pudo cargar vJoyInterface.dll. Ajusta --vjoy-dll.")
+
+    @staticmethod
+    def _normalize_ffb_magnitude(raw_magnitude: int) -> int:
+        mag = int(raw_magnitude)
+
+        # Defensive decode: some environments expose signed values wrapped in 16-bit unsigned form.
+        if mag > 32767:
+            mag -= 65536
+
+        # Keep vJoy documented range.
+        if mag > 10000:
+            mag = 10000
+        elif mag < -10000:
+            mag = -10000
+        return mag
 
     def _setup_prototypes(self) -> None:
         d = self.dll
@@ -161,6 +259,9 @@ class VJoyBridge:
         d.Ffb_h_EffOp.argtypes = [ctypes.POINTER(FFB_DATA), ctypes.POINTER(FFB_EFF_OP)]
         d.Ffb_h_EffOp.restype = ctypes.c_uint32
 
+        d.Ffb_h_Eff_Report.argtypes = [ctypes.POINTER(FFB_DATA), ctypes.POINTER(FFB_EFF_REPORT)]
+        d.Ffb_h_Eff_Report.restype = ctypes.c_uint32
+
         # FfbGenCB signature: void CALLBACK cb(PVOID data, PVOID userdata)
         self._cb_type = ctypes.WINFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p)
         d.FfbRegisterGenCB.argtypes = [self._cb_type, ctypes.c_void_p]
@@ -185,15 +286,39 @@ class VJoyBridge:
             gain = ctypes.c_ubyte(0)
             if self.dll.Ffb_h_DevGain(pkt, ctypes.byref(gain)) == ERROR_SUCCESS:
                 self.torque_state.set_device_gain(gain.value)
+                self._log_ffb(f"DevGain={gain.value}")
 
             const_eff = FFB_EFF_CONSTANT()
             if self.dll.Ffb_h_Eff_Constant(pkt, ctypes.byref(const_eff)) == ERROR_SUCCESS:
-                self.torque_state.set_constant(const_eff.Magnitude)
+                mag = self._normalize_ffb_magnitude(const_eff.Magnitude)
+                self.torque_state.set_constant_for_block(const_eff.EffectBlockIndex, mag)
+                self._log_ffb(
+                    f"Const block={const_eff.EffectBlockIndex} mag_raw={const_eff.Magnitude} mag={mag}"
+                )
+
+            eff_report = FFB_EFF_REPORT()
+            eff_report_res = self.dll.Ffb_h_Eff_Report(pkt, ctypes.byref(eff_report))
+            if eff_report_res == ERROR_SUCCESS:
+                if bool(eff_report.Polar):
+                    self.torque_state.set_effect_direction_polar(eff_report.EffectBlockIndex, eff_report.Direction)
+                    self._log_ffb(
+                        f"EffReport block={eff_report.EffectBlockIndex} polar dirByte={eff_report.Direction} gain={eff_report.Gain}"
+                    )
+                else:
+                    self.torque_state.set_effect_direction_cartesian_x(eff_report.EffectBlockIndex, eff_report.Direction)
+                    self._log_ffb(
+                        f"EffReport block={eff_report.EffectBlockIndex} cart dirX={eff_report.Direction} gain={eff_report.Gain}"
+                    )
+            elif self.debug_ffb:
+                self._log_ffb(f"EffReport not available (res={eff_report_res})")
 
             eff_op = FFB_EFF_OP()
             if self.dll.Ffb_h_EffOp(pkt, ctypes.byref(eff_op)) == ERROR_SUCCESS:
                 if int(eff_op.EffectOp) == EFF_STOP:
-                    self.torque_state.stop_effects()
+                    self.torque_state.stop_effect_block(eff_op.EffectBlockIndex)
+                self._log_ffb(
+                    f"EffOp block={eff_op.EffectBlockIndex} op={int(eff_op.EffectOp)} loops={eff_op.LoopCount}"
+                )
 
         self._ffb_cb_ref = self._cb_type(_ffb_cb)
         self.dll.FfbRegisterGenCB(self._ffb_cb_ref, None)
@@ -317,7 +442,13 @@ def open_serial(args: argparse.Namespace) -> serial.Serial:
 
 def run(args: argparse.Namespace) -> int:
     torque_state = TorqueState(max_torque=args.max_torque)
-    vjoy = VJoyBridge(args.vjoy_dll, args.vjoy_id, torque_state)
+    vjoy = VJoyBridge(
+        args.vjoy_dll,
+        args.vjoy_id,
+        torque_state,
+        debug_ffb=args.debug_ffb,
+        debug_print_interval=args.debug_print_interval,
+    )
     ser = open_serial(args)
 
     stop_event = threading.Event()
@@ -337,6 +468,7 @@ def run(args: argparse.Namespace) -> int:
     last_print = time.monotonic()
     last_axes = (0, 0, 0)
     consecutive_write_failures = 0
+    last_tx_debug = 0.0
 
     try:
         while not stop_event.is_set():
@@ -364,9 +496,23 @@ def run(args: argparse.Namespace) -> int:
 
             torque = torque_state.compute_torque()
             try:
-                ser.write(build_torque_packet(tx_seq, torque, 255, 0))
+                tx_pkt = build_torque_packet(tx_seq, torque, 255, 0)
+                ser.write(tx_pkt)
                 tx_seq = (tx_seq + 1) & 0xFF
                 consecutive_write_failures = 0
+
+                if args.debug_tx:
+                    now_dbg = time.monotonic()
+                    if (now_dbg - last_tx_debug) >= args.debug_print_interval:
+                        dev_gain, eff_mag, eff_dir, eff_active = torque_state.snapshot()
+                        print(
+                            "[TX] "
+                            f"torque={torque:5d} gain={dev_gain:3d} "
+                            f"pkt={tx_pkt.hex(' ')} "
+                            f"effects_mag={eff_mag} effects_dir={ {k: round(v, 3) for k, v in eff_dir.items()} } active={eff_active}",
+                            flush=True,
+                        )
+                        last_tx_debug = now_dbg
             except (serial.SerialTimeoutException, serial.SerialException) as exc:
                 consecutive_write_failures += 1
                 if args.verbose:
@@ -425,6 +571,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--write-timeout", type=float, default=0.25, help="Timeout de escritura serial (s)")
     p.add_argument("--startup-delay", type=float, default=1.2, help="Espera tras abrir COM para evitar resets (s)")
     p.add_argument("--reopen-after-failures", type=int, default=8, help="Reabrir COM tras N fallos de escritura")
+    p.add_argument("--debug-ffb", action="store_true", help="Imprime paquetes/estado FFB que llegan desde vJoy")
+    p.add_argument("--debug-tx", action="store_true", help="Imprime paquetes de torque enviados al ESP")
+    p.add_argument("--debug-print-interval", type=float, default=0.05, help="Intervalo minimo entre prints de debug (s)")
     p.add_argument("--verbose", action="store_true", help="Imprime telemetria/torque cada 200ms")
     return p
 
