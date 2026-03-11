@@ -6,8 +6,6 @@ Protocol (little-endian):
   [0]=0xAB [1]=0x10 [2]=seq [3:5]=x [5:7]=y [7:9]=z [9:13]=buttons_u32 [13]=crc_xor
 - PC -> ESP torque command (8 bytes):
   [0]=0xAB [1]=0x20 [2]=seq [3:5]=torque_i16 [5]=gain_u8 [6]=flags [7]=crc_xor
-- PC -> ESP heartbeat (4 bytes):
-  [0]=0xAB [1]=0x21 [2]=seq [3]=crc_xor
 """
 
 from __future__ import annotations
@@ -28,11 +26,9 @@ import serial
 BRIDGE_START = 0xAB
 PKT_TELEMETRY = 0x10
 PKT_TORQUE = 0x20
-PKT_HEARTBEAT = 0x21
 
 TELEMETRY_LEN = 14
 TORQUE_LEN = 8
-HEARTBEAT_LEN = 4
 
 HID_USAGE_X = 0x30
 HID_USAGE_Y = 0x31
@@ -837,15 +833,6 @@ def build_torque_packet(seq: int, torque: int, gain: int = 255, flags: int = 0) 
     return bytes(msg)
 
 
-def build_heartbeat_packet(seq: int) -> bytes:
-    msg = bytearray(HEARTBEAT_LEN)
-    msg[0] = BRIDGE_START
-    msg[1] = PKT_HEARTBEAT
-    msg[2] = seq & 0xFF
-    msg[3] = crc_xor(msg[:-1])
-    return bytes(msg)
-
-
 def parse_telemetry_frame(frame: bytes) -> tuple[int, int, int, int, int]:
     if len(frame) != TELEMETRY_LEN:
         raise ValueError("telemetry len invalido")
@@ -867,7 +854,6 @@ def open_serial(args: argparse.Namespace) -> serial.Serial:
         port=args.port,
         baudrate=args.baud,
         timeout=0.005,
-        write_timeout=args.write_timeout,
         xonxoff=False,
         rtscts=False,
         dsrdtr=False,
@@ -916,10 +902,8 @@ def run(args: argparse.Namespace) -> int:
 
     rx = bytearray()
     tx_seq = 0
-    last_hb = time.monotonic()
     last_print = time.monotonic()
     last_axes = (0, 0, 0)
-    consecutive_write_failures = 0
     last_tx_debug = 0.0
 
     try:
@@ -950,50 +934,24 @@ def run(args: argparse.Namespace) -> int:
             now = time.monotonic()
             vjoy.tick_effects(now)
             torque = torque_state.compute_torque()
-            try:
-                tx_pkt = build_torque_packet(tx_seq, torque, 255, 0)
-                ser.write(tx_pkt)
-                tx_seq = (tx_seq + 1) & 0xFF
-                consecutive_write_failures = 0
+            tx_pkt = build_torque_packet(tx_seq, torque, 255, 0)
+            ser.write(tx_pkt)
+            tx_seq = (tx_seq + 1) & 0xFF
 
-                if args.debug_tx:
-                    now_dbg = time.monotonic()
-                    if (now_dbg - last_tx_debug) >= args.debug_print_interval:
-                        dev_gain, eff_force, eff_active, motion = torque_state.snapshot()
-                        print(
-                            "[TX] "
-                            f"torque={torque:5d} gain={dev_gain:3d} "
-                            f"pkt={tx_pkt.hex(' ')} "
-                            f"effects_force={ {k: round(v, 4) for k, v in eff_force.items()} } "
-                            f"active={eff_active} "
-                            f"motion={ {k: round(v, 4) for k, v in motion.items()} }",
-                            flush=True,
-                        )
-                        last_tx_debug = now_dbg
-            except (serial.SerialTimeoutException, serial.SerialException) as exc:
-                consecutive_write_failures += 1
-                if args.verbose:
-                    print(f"Serial write fallo ({consecutive_write_failures}): {exc}", flush=True)
-                if consecutive_write_failures >= args.reopen_after_failures:
-                    if args.verbose:
-                        print("Reabriendo puerto serial...", flush=True)
-                    try:
-                        ser.close()
-                    except Exception:
-                        pass
-                    time.sleep(0.3)
-                    ser = open_serial(args)
-                    consecutive_write_failures = 0
-                time.sleep(0.01)
-                continue
-
-            if now - last_hb >= 0.5:
-                try:
-                    ser.write(build_heartbeat_packet(tx_seq))
-                    tx_seq = (tx_seq + 1) & 0xFF
-                    last_hb = now
-                except (serial.SerialTimeoutException, serial.SerialException):
-                    pass
+            if args.debug_tx:
+                now_dbg = time.monotonic()
+                if (now_dbg - last_tx_debug) >= args.debug_print_interval:
+                    dev_gain, eff_force, eff_active, motion = torque_state.snapshot()
+                    print(
+                        "[TX] "
+                        f"torque={torque:5d} gain={dev_gain:3d} "
+                        f"pkt={tx_pkt.hex(' ')} "
+                        f"effects_force={ {k: round(v, 4) for k, v in eff_force.items()} } "
+                        f"active={eff_active} "
+                        f"motion={ {k: round(v, 4) for k, v in motion.items()} }",
+                        flush=True,
+                    )
+                    last_tx_debug = now_dbg
 
             if args.verbose and now - last_print >= 0.2:
                 print(
@@ -1024,9 +982,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--vjoy-dll", default=None, help="Ruta a vJoyInterface.dll")
     p.add_argument("--max-torque", type=int, default=1000, help="Torque maximo enviado al ESP")
     p.add_argument("--loop-sleep", type=float, default=0.002, help="Sleep del loop principal (s)")
-    p.add_argument("--write-timeout", type=float, default=0.25, help="Timeout de escritura serial (s)")
     p.add_argument("--startup-delay", type=float, default=1.2, help="Espera tras abrir COM para evitar resets (s)")
-    p.add_argument("--reopen-after-failures", type=int, default=8, help="Reabrir COM tras N fallos de escritura")
     p.add_argument("--debug-ffb", action="store_true", help="Imprime paquetes/estado FFB que llegan desde vJoy")
     p.add_argument("--debug-tx", action="store_true", help="Imprime paquetes de torque enviados al ESP")
     p.add_argument("--debug-print-interval", type=float, default=0.05, help="Intervalo minimo entre prints de debug (s)")

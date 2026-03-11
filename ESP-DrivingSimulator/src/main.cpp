@@ -27,9 +27,7 @@
 #define BRIDGE_START_BYTE 0xAB
 #define BRIDGE_PKT_TELEMETRY 0x10
 #define BRIDGE_PKT_TORQUE_CMD 0x20
-#define BRIDGE_PKT_HEARTBEAT 0x21
 #define BRIDGE_TELEMETRY_INTERVAL_MS 5
-#define BRIDGE_CMD_TIMEOUT_MS 120
 
 // Driver BTS7960B pins and settings.
 #define BTS_RPWM_PIN 6
@@ -92,7 +90,6 @@ uint8_t bridge_rx_expected = 0;
 // Force feedback (FFB) variables.
 volatile int16_t ffb_torque_value = 0;
 volatile uint8_t ffb_device_gain = 255;
-volatile uint32_t ffb_last_cmd_ms = 0;
 
 // PID controller variables.
 int16_t ffb_position = 0;
@@ -297,9 +294,6 @@ uint8_t bridge_packet_len(uint8_t type) {
     if (type == BRIDGE_PKT_TORQUE_CMD) {
         return 8;
     }
-    if (type == BRIDGE_PKT_HEARTBEAT) {
-        return 4;
-    }
     return 0;
 }
 
@@ -309,17 +303,11 @@ void process_bridge_packet(const uint8_t* pkt, uint8_t len) {
     }
 
     const uint8_t type = pkt[1];
-    if (type == BRIDGE_PKT_HEARTBEAT) {
-        ffb_last_cmd_ms = millis();
-        return;
-    }
-
     if (type == BRIDGE_PKT_TORQUE_CMD && len >= 8) {
         int16_t torque = (int16_t)((uint16_t)pkt[3] | ((uint16_t)pkt[4] << 8));
         uint8_t gain = pkt[5];
         ffb_torque_value = constrain(torque, -FFB_ABS_MAX_VAL, FFB_ABS_MAX_VAL);
         ffb_device_gain = gain;
-        ffb_last_cmd_ms = millis();
     }
 }
 
@@ -566,7 +554,6 @@ void setup() {
     motor_self_test();
 
     pcnt_get_counter_value(PCNT_UNIT_USED, &ffb_position);
-    ffb_last_cmd_ms = millis();
 }
 
 void loop() {
@@ -580,10 +567,6 @@ void loop() {
     joyZ = get_brake_position();
 
     uint32_t now = millis();
-    if ((uint32_t)(now - ffb_last_cmd_ms) > BRIDGE_CMD_TIMEOUT_MS) {
-        ffb_torque_value = 0;
-        ffb_device_gain = 255;
-    }
 
     set_motor_torque(ffb_torque_value);
 
