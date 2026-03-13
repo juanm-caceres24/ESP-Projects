@@ -1,0 +1,252 @@
+===== line 46611 =====
+46601`t2026-03-12T17:53:37.805 [FFB] Constant block=1 magnitude=-1082
+46602`t2026-03-12T17:53:37.806 [FFB] Packet type=0x0005
+46603`t2026-03-12T17:53:37.806 [FFB] Constant block=1 magnitude=0
+46604`t2026-03-12T17:53:37.807 [FFB] Packet type=0x0005
+46605`t2026-03-12T17:53:37.807 [FFB] Constant block=1 magnitude=0
+46606`t2026-03-12T17:53:37.808 [FFB] Packet type=0x0005
+46607`t2026-03-12T17:53:37.808 [FFB] Constant block=1 magnitude=0
+46608`t2026-03-12T17:53:37.810 [FFB] Packet type=0x0005
+46609`t2026-03-12T17:53:37.810 [FFB] Constant block=1 magnitude=0
+46610`t2026-03-12T17:53:37.810 [FFB] Packet type=0x000A
+46611`t2026-03-12T17:53:37.810 [FFB] EffOp block=1 op=3 loops=0
+46612`t2026-03-12T17:53:37.810 [FFB] Packet type=0x0003
+46613`t2026-03-12T17:53:37.810 [FFB] Condition block=1 axis=X center=0 dead=0 posCoeff=0 negCoeff=0 posSat=10000 negSat=10000
+46614`t2026-03-12T17:53:37.812 [FFB] Packet type=0x0005
+46615`t2026-03-12T17:53:37.812 [FFB] Constant block=1 magnitude=0
+46616`t2026-03-12T17:53:37.813 [FFB] Packet type=0x0005
+46617`t2026-03-12T17:53:37.813 [FFB] Constant block=1 magnitude=0
+46618`t2026-03-12T17:53:37.815 [RX] seq=  0 x=   -50 y=-32768 z= 32767 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 ff 7f 00 00 00 00 8a
+46619`t2026-03-12T17:53:37.815 [RX] seq=  0 x=   -50 y=-32768 z= 32767 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 ff 7f 00 00 00 00 8a
+46620`t2026-03-12T17:53:37.816 [FFB] Packet type=0x0005
+46621`t2026-03-12T17:53:37.816 [FFB] Constant block=1 magnitude=0
+46622`t2026-03-12T17:53:37.816 [FFB] Packet type=0x0005
+46623`t2026-03-12T17:53:37.816 [FFB] Constant block=1 magnitude=0
+46624`t2026-03-12T17:53:37.816 [RX] seq=  0 x=   -50 y=-32768 z= 32767 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 ff 7f 00 00 00 00 8a
+46625`t2026-03-12T17:53:37.816 [TX] seq=251 torque=    0 gain=255 pkt=ab 20 fb 00 00 ff 00 8f effects_force={1: 0.0} active={1: False} motion={'x_norm': -0.0015, 'x_vel': 0.0, 'x_acc': 0.0}
+46626`t2026-03-12T17:53:37.817 [FFB] Packet type=0x0005
+46627`t2026-03-12T17:53:37.817 [FFB] Constant block=1 magnitude=0
+46628`t2026-03-12T17:53:37.819 [FFB] Packet type=0x0005
+46629`t2026-03-12T17:53:37.819 [FFB] Constant block=1 magnitude=0
+46630`t2026-03-12T17:53:37.821 [FFB] Packet type=0x0005
+46631`t2026-03-12T17:53:37.821 [FFB] Constant block=1 magnitude=0
+46632`t2026-03-12T17:53:37.824 [FFB] Packet type=0x0005
+46633`t2026-03-12T17:53:37.824 [FFB] Constant block=1 magnitude=0
+46634`t2026-03-12T17:53:37.825 [FFB] Packet type=0x0005
+46635`t2026-03-12T17:53:37.825 [FFB] Constant block=1 magnitude=0
+===== line 50797 =====
+50787`t2026-03-12T17:53:40.261 [FFB] Constant block=1 magnitude=0
+50788`t2026-03-12T17:53:40.262 [FFB] Packet type=0x0005
+50789`t2026-03-12T17:53:40.262 [FFB] Constant block=1 magnitude=0
+50790`t2026-03-12T17:53:40.264 [FFB] Packet type=0x0005
+50791`t2026-03-12T17:53:40.264 [FFB] Constant block=1 magnitude=-1094
+50792`t2026-03-12T17:53:40.267 [FFB] Packet type=0x0005
+50793`t2026-03-12T17:53:40.267 [FFB] Constant block=1 magnitude=-1097
+50794`t2026-03-12T17:53:40.267 [FFB] Packet type=0x0003
+50795`t2026-03-12T17:53:40.267 [FFB] Condition block=1 axis=X center=0 dead=0 posCoeff=5000 negCoeff=5000 posSat=10000 negSat=10000
+50796`t2026-03-12T17:53:40.267 [FFB] Packet type=0x0001
+50797`t2026-03-12T17:53:40.267 [FFB] EffReport block=1 type=damper duration=65535 gain=255 polar=1 dir=63 dirY=0
+50798`t2026-03-12T17:53:40.267 [FFB] Packet type=0x000A
+50799`t2026-03-12T17:53:40.267 [FFB] EffOp block=1 op=1 loops=1
+50800`t2026-03-12T17:53:40.269 [FFB] Packet type=0x0005
+50801`t2026-03-12T17:53:40.269 [FFB] Constant block=1 magnitude=-1102
+50802`t2026-03-12T17:53:40.271 [FFB] Packet type=0x0005
+50803`t2026-03-12T17:53:40.271 [FFB] Constant block=1 magnitude=-1088
+50804`t2026-03-12T17:53:40.273 [RX] seq=  0 x=   -50 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 00 80 00 00 00 00 8a
+50805`t2026-03-12T17:53:40.273 [RX] seq=  0 x=   -50 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 00 80 00 00 00 00 8a
+50806`t2026-03-12T17:53:40.274 [RX] seq=  0 x=   -50 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 00 80 00 00 00 00 8a
+50807`t2026-03-12T17:53:40.274 [TX] seq=153 torque=    0 gain=255 pkt=ab 20 99 00 00 ff 00 ed effects_force={1: 0.0} active={1: True} motion={'x_norm': -0.0015, 'x_vel': 0.0, 'x_acc': 0.0}
+50808`t2026-03-12T17:53:40.274 [FFB] Packet type=0x0005
+50809`t2026-03-12T17:53:40.274 [FFB] Constant block=1 magnitude=-1047
+50810`t2026-03-12T17:53:40.277 [FFB] Packet type=0x0005
+50811`t2026-03-12T17:53:40.277 [FFB] Constant block=1 magnitude=-1013
+50812`t2026-03-12T17:53:40.279 [FFB] Packet type=0x0005
+50813`t2026-03-12T17:53:40.279 [FFB] Constant block=1 magnitude=-1368
+50814`t2026-03-12T17:53:40.282 [FFB] Packet type=0x0005
+50815`t2026-03-12T17:53:40.282 [FFB] Constant block=1 magnitude=-4333
+50816`t2026-03-12T17:53:40.284 [FFB] Packet type=0x0005
+50817`t2026-03-12T17:53:40.284 [FFB] Constant block=1 magnitude=-2743
+50818`t2026-03-12T17:53:40.287 [FFB] Packet type=0x0005
+50819`t2026-03-12T17:53:40.287 [FFB] Constant block=1 magnitude=-1194
+50820`t2026-03-12T17:53:40.288 [RX] seq=  0 x=   -50 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 00 80 00 00 00 00 8a
+50821`t2026-03-12T17:53:40.288 [RX] seq=  0 x=   -50 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 00 80 00 00 00 00 8a
+===== line 50799 =====
+50789`t2026-03-12T17:53:40.262 [FFB] Constant block=1 magnitude=0
+50790`t2026-03-12T17:53:40.264 [FFB] Packet type=0x0005
+50791`t2026-03-12T17:53:40.264 [FFB] Constant block=1 magnitude=-1094
+50792`t2026-03-12T17:53:40.267 [FFB] Packet type=0x0005
+50793`t2026-03-12T17:53:40.267 [FFB] Constant block=1 magnitude=-1097
+50794`t2026-03-12T17:53:40.267 [FFB] Packet type=0x0003
+50795`t2026-03-12T17:53:40.267 [FFB] Condition block=1 axis=X center=0 dead=0 posCoeff=5000 negCoeff=5000 posSat=10000 negSat=10000
+50796`t2026-03-12T17:53:40.267 [FFB] Packet type=0x0001
+50797`t2026-03-12T17:53:40.267 [FFB] EffReport block=1 type=damper duration=65535 gain=255 polar=1 dir=63 dirY=0
+50798`t2026-03-12T17:53:40.267 [FFB] Packet type=0x000A
+50799`t2026-03-12T17:53:40.267 [FFB] EffOp block=1 op=1 loops=1
+50800`t2026-03-12T17:53:40.269 [FFB] Packet type=0x0005
+50801`t2026-03-12T17:53:40.269 [FFB] Constant block=1 magnitude=-1102
+50802`t2026-03-12T17:53:40.271 [FFB] Packet type=0x0005
+50803`t2026-03-12T17:53:40.271 [FFB] Constant block=1 magnitude=-1088
+50804`t2026-03-12T17:53:40.273 [RX] seq=  0 x=   -50 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 00 80 00 00 00 00 8a
+50805`t2026-03-12T17:53:40.273 [RX] seq=  0 x=   -50 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 00 80 00 00 00 00 8a
+50806`t2026-03-12T17:53:40.274 [RX] seq=  0 x=   -50 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 00 80 00 00 00 00 8a
+50807`t2026-03-12T17:53:40.274 [TX] seq=153 torque=    0 gain=255 pkt=ab 20 99 00 00 ff 00 ed effects_force={1: 0.0} active={1: True} motion={'x_norm': -0.0015, 'x_vel': 0.0, 'x_acc': 0.0}
+50808`t2026-03-12T17:53:40.274 [FFB] Packet type=0x0005
+50809`t2026-03-12T17:53:40.274 [FFB] Constant block=1 magnitude=-1047
+50810`t2026-03-12T17:53:40.277 [FFB] Packet type=0x0005
+50811`t2026-03-12T17:53:40.277 [FFB] Constant block=1 magnitude=-1013
+50812`t2026-03-12T17:53:40.279 [FFB] Packet type=0x0005
+50813`t2026-03-12T17:53:40.279 [FFB] Constant block=1 magnitude=-1368
+50814`t2026-03-12T17:53:40.282 [FFB] Packet type=0x0005
+50815`t2026-03-12T17:53:40.282 [FFB] Constant block=1 magnitude=-4333
+50816`t2026-03-12T17:53:40.284 [FFB] Packet type=0x0005
+50817`t2026-03-12T17:53:40.284 [FFB] Constant block=1 magnitude=-2743
+50818`t2026-03-12T17:53:40.287 [FFB] Packet type=0x0005
+50819`t2026-03-12T17:53:40.287 [FFB] Constant block=1 magnitude=-1194
+50820`t2026-03-12T17:53:40.288 [RX] seq=  0 x=   -50 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 00 80 00 00 00 00 8a
+50821`t2026-03-12T17:53:40.288 [RX] seq=  0 x=   -50 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 00 80 00 00 00 00 8a
+50822`t2026-03-12T17:53:40.289 [RX] seq=  0 x=   -50 y=-32768 z=-32618 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 96 80 00 00 00 00 1c
+50823`t2026-03-12T17:53:40.289 [TX] seq=154 torque=    0 gain=255 pkt=ab 20 9a 00 00 ff 00 ee effects_force={1: 0.0} active={1: True} motion={'x_norm': -0.0015, 'x_vel': 0.0, 'x_acc': 0.0}
+===== line 67787 =====
+67777`t2026-03-12T17:53:55.072 [RX] seq=  0 x=   -50 y=-32768 z= 32767 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 ff 7f 00 00 00 00 8a
+67778`t2026-03-12T17:53:55.073 [RX] seq=  0 x=   -50 y=-32768 z= 32767 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 ff 7f 00 00 00 00 8a
+67779`t2026-03-12T17:53:55.073 [TX] seq= 78 torque=    0 gain=255 pkt=ab 20 4e 00 00 ff 00 3a effects_force={1: 0.0} active={1: True} motion={'x_norm': -0.0015, 'x_vel': 0.0, 'x_acc': 0.0}
+67780`t2026-03-12T17:53:55.074 [FFB] Packet type=0x0005
+67781`t2026-03-12T17:53:55.074 [FFB] Constant block=1 magnitude=0
+67782`t2026-03-12T17:53:55.075 [FFB] Packet type=0x0005
+67783`t2026-03-12T17:53:55.075 [FFB] Constant block=1 magnitude=0
+67784`t2026-03-12T17:53:55.075 [FFB] Packet type=0x0005
+67785`t2026-03-12T17:53:55.075 [FFB] Constant block=1 magnitude=0
+67786`t2026-03-12T17:53:55.075 [FFB] Packet type=0x000A
+67787`t2026-03-12T17:53:55.075 [FFB] EffOp block=1 op=3 loops=0
+67788`t2026-03-12T17:53:55.075 [FFB] Packet type=0x0003
+67789`t2026-03-12T17:53:55.075 [FFB] Condition block=1 axis=X center=0 dead=0 posCoeff=0 negCoeff=0 posSat=10000 negSat=10000
+67790`t2026-03-12T17:53:55.076 [FFB] Packet type=0x0005
+67791`t2026-03-12T17:53:55.077 [FFB] Constant block=1 magnitude=0
+67792`t2026-03-12T17:53:55.079 [FFB] Packet type=0x0005
+67793`t2026-03-12T17:53:55.079 [FFB] Constant block=1 magnitude=0
+67794`t2026-03-12T17:53:55.080 [FFB] Packet type=0x0005
+67795`t2026-03-12T17:53:55.080 [FFB] Constant block=1 magnitude=0
+67796`t2026-03-12T17:53:55.081 [FFB] Packet type=0x0005
+67797`t2026-03-12T17:53:55.081 [FFB] Constant block=1 magnitude=0
+67798`t2026-03-12T17:53:55.083 [FFB] Packet type=0x0005
+67799`t2026-03-12T17:53:55.083 [FFB] Constant block=1 magnitude=0
+67800`t2026-03-12T17:53:55.085 [FFB] Packet type=0x0005
+67801`t2026-03-12T17:53:55.085 [FFB] Constant block=1 magnitude=0
+67802`t2026-03-12T17:53:55.086 [FFB] Packet type=0x0005
+67803`t2026-03-12T17:53:55.086 [FFB] Constant block=1 magnitude=0
+67804`t2026-03-12T17:53:55.086 [RX] seq=  0 x=   -50 y=-32768 z= 32016 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 10 7d 00 00 00 00 67
+67805`t2026-03-12T17:53:55.087 [FFB] Packet type=0x0005
+67806`t2026-03-12T17:53:55.087 [FFB] Constant block=1 magnitude=0
+67807`t2026-03-12T17:53:55.087 [FFB] Packet type=0x0005
+67808`t2026-03-12T17:53:55.087 [FFB] Constant block=1 magnitude=0
+67809`t2026-03-12T17:53:55.087 [RX] seq=  0 x=   -50 y=-32768 z= 32767 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 ff 7f 00 00 00 00 8a
+67810`t2026-03-12T17:53:55.088 [RX] seq=  0 x=   -50 y=-32768 z= 30890 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 aa 78 00 00 00 00 d8
+67811`t2026-03-12T17:53:55.088 [TX] seq= 79 torque=    0 gain=255 pkt=ab 20 4f 00 00 ff 00 3b effects_force={1: 0.0} active={1: False} motion={'x_norm': -0.0015, 'x_vel': 0.0, 'x_acc': 0.0}
+===== line 71291 =====
+71281`t2026-03-12T17:53:56.957 [TX] seq=199 torque=    0 gain=255 pkt=ab 20 c7 00 00 ff 00 b3 effects_force={1: 0.0} active={1: False} motion={'x_norm': -0.0015, 'x_vel': 0.0, 'x_acc': 0.0}
+71282`t2026-03-12T17:53:56.957 [FFB] Packet type=0x0005
+71283`t2026-03-12T17:53:56.957 [FFB] Constant block=1 magnitude=0
+71284`t2026-03-12T17:53:56.958 [FFB] Packet type=0x0005
+71285`t2026-03-12T17:53:56.958 [FFB] Constant block=1 magnitude=0
+71286`t2026-03-12T17:53:56.960 [FFB] Packet type=0x0005
+71287`t2026-03-12T17:53:56.960 [FFB] Constant block=1 magnitude=0
+71288`t2026-03-12T17:53:56.960 [FFB] Packet type=0x0003
+71289`t2026-03-12T17:53:56.960 [FFB] Condition block=1 axis=X center=0 dead=0 posCoeff=5000 negCoeff=5000 posSat=10000 negSat=10000
+71290`t2026-03-12T17:53:56.960 [FFB] Packet type=0x0001
+71291`t2026-03-12T17:53:56.960 [FFB] EffReport block=1 type=damper duration=65535 gain=255 polar=1 dir=63 dirY=0
+71292`t2026-03-12T17:53:56.960 [FFB] Packet type=0x000A
+71293`t2026-03-12T17:53:56.960 [FFB] EffOp block=1 op=1 loops=1
+71294`t2026-03-12T17:53:56.962 [FFB] Packet type=0x0005
+71295`t2026-03-12T17:53:56.963 [FFB] Constant block=1 magnitude=0
+71296`t2026-03-12T17:53:56.965 [FFB] Packet type=0x0005
+71297`t2026-03-12T17:53:56.965 [FFB] Constant block=1 magnitude=0
+71298`t2026-03-12T17:53:56.967 [FFB] Packet type=0x0005
+71299`t2026-03-12T17:53:56.967 [FFB] Constant block=1 magnitude=0
+71300`t2026-03-12T17:53:56.970 [FFB] Packet type=0x0005
+71301`t2026-03-12T17:53:56.970 [FFB] Constant block=1 magnitude=0
+71302`t2026-03-12T17:53:56.971 [RX] seq=  0 x=   -50 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 00 80 00 00 00 00 8a
+71303`t2026-03-12T17:53:56.972 [RX] seq=  0 x=   -50 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 00 80 00 00 00 00 8a
+71304`t2026-03-12T17:53:56.972 [RX] seq=  0 x=   -50 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 00 80 00 00 00 00 8a
+71305`t2026-03-12T17:53:56.973 [FFB] Packet type=0x0005
+71306`t2026-03-12T17:53:56.973 [TX] seq=200 torque=    0 gain=255 pkt=ab 20 c8 00 00 ff 00 bc effects_force={1: 0.0} active={1: True} motion={'x_norm': -0.0015, 'x_vel': 0.0, 'x_acc': 0.0}
+71307`t2026-03-12T17:53:56.973 [FFB] Constant block=1 magnitude=0
+71308`t2026-03-12T17:53:56.975 [FFB] Packet type=0x0005
+71309`t2026-03-12T17:53:56.975 [FFB] Constant block=1 magnitude=0
+71310`t2026-03-12T17:53:56.978 [FFB] Packet type=0x0005
+71311`t2026-03-12T17:53:56.978 [FFB] Constant block=1 magnitude=0
+71312`t2026-03-12T17:53:56.980 [FFB] Packet type=0x0005
+71313`t2026-03-12T17:53:56.980 [FFB] Constant block=1 magnitude=0
+71314`t2026-03-12T17:53:56.983 [FFB] Packet type=0x0005
+71315`t2026-03-12T17:53:56.983 [FFB] Constant block=1 magnitude=0
+===== line 71293 =====
+71283`t2026-03-12T17:53:56.957 [FFB] Constant block=1 magnitude=0
+71284`t2026-03-12T17:53:56.958 [FFB] Packet type=0x0005
+71285`t2026-03-12T17:53:56.958 [FFB] Constant block=1 magnitude=0
+71286`t2026-03-12T17:53:56.960 [FFB] Packet type=0x0005
+71287`t2026-03-12T17:53:56.960 [FFB] Constant block=1 magnitude=0
+71288`t2026-03-12T17:53:56.960 [FFB] Packet type=0x0003
+71289`t2026-03-12T17:53:56.960 [FFB] Condition block=1 axis=X center=0 dead=0 posCoeff=5000 negCoeff=5000 posSat=10000 negSat=10000
+71290`t2026-03-12T17:53:56.960 [FFB] Packet type=0x0001
+71291`t2026-03-12T17:53:56.960 [FFB] EffReport block=1 type=damper duration=65535 gain=255 polar=1 dir=63 dirY=0
+71292`t2026-03-12T17:53:56.960 [FFB] Packet type=0x000A
+71293`t2026-03-12T17:53:56.960 [FFB] EffOp block=1 op=1 loops=1
+71294`t2026-03-12T17:53:56.962 [FFB] Packet type=0x0005
+71295`t2026-03-12T17:53:56.963 [FFB] Constant block=1 magnitude=0
+71296`t2026-03-12T17:53:56.965 [FFB] Packet type=0x0005
+71297`t2026-03-12T17:53:56.965 [FFB] Constant block=1 magnitude=0
+71298`t2026-03-12T17:53:56.967 [FFB] Packet type=0x0005
+71299`t2026-03-12T17:53:56.967 [FFB] Constant block=1 magnitude=0
+71300`t2026-03-12T17:53:56.970 [FFB] Packet type=0x0005
+71301`t2026-03-12T17:53:56.970 [FFB] Constant block=1 magnitude=0
+71302`t2026-03-12T17:53:56.971 [RX] seq=  0 x=   -50 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 00 80 00 00 00 00 8a
+71303`t2026-03-12T17:53:56.972 [RX] seq=  0 x=   -50 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 00 80 00 00 00 00 8a
+71304`t2026-03-12T17:53:56.972 [RX] seq=  0 x=   -50 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 ce ff 00 80 00 80 00 00 00 00 8a
+71305`t2026-03-12T17:53:56.973 [FFB] Packet type=0x0005
+71306`t2026-03-12T17:53:56.973 [TX] seq=200 torque=    0 gain=255 pkt=ab 20 c8 00 00 ff 00 bc effects_force={1: 0.0} active={1: True} motion={'x_norm': -0.0015, 'x_vel': 0.0, 'x_acc': 0.0}
+71307`t2026-03-12T17:53:56.973 [FFB] Constant block=1 magnitude=0
+71308`t2026-03-12T17:53:56.975 [FFB] Packet type=0x0005
+71309`t2026-03-12T17:53:56.975 [FFB] Constant block=1 magnitude=0
+71310`t2026-03-12T17:53:56.978 [FFB] Packet type=0x0005
+71311`t2026-03-12T17:53:56.978 [FFB] Constant block=1 magnitude=0
+71312`t2026-03-12T17:53:56.980 [FFB] Packet type=0x0005
+71313`t2026-03-12T17:53:56.980 [FFB] Constant block=1 magnitude=0
+71314`t2026-03-12T17:53:56.983 [FFB] Packet type=0x0005
+71315`t2026-03-12T17:53:56.983 [FFB] Constant block=1 magnitude=0
+71316`t2026-03-12T17:53:56.985 [FFB] Packet type=0x0005
+71317`t2026-03-12T17:53:56.985 [FFB] Constant block=1 magnitude=0
+===== line 104647 =====
+104637`t2026-03-12T17:54:26.088 [FFB] Constant block=1 magnitude=-592
+104638`t2026-03-12T17:54:26.088 [FFB] Packet type=0x0005
+104639`t2026-03-12T17:54:26.088 [FFB] Constant block=1 magnitude=0
+104640`t2026-03-12T17:54:26.088 [FFB] Packet type=0x0005
+104641`t2026-03-12T17:54:26.088 [FFB] Constant block=1 magnitude=0
+104642`t2026-03-12T17:54:26.090 [FFB] Packet type=0x0005
+104643`t2026-03-12T17:54:26.090 [FFB] Constant block=1 magnitude=0
+104644`t2026-03-12T17:54:26.091 [FFB] Packet type=0x0005
+104645`t2026-03-12T17:54:26.091 [FFB] Constant block=1 magnitude=0
+104646`t2026-03-12T17:54:26.091 [FFB] Packet type=0x000A
+104647`t2026-03-12T17:54:26.091 [FFB] EffOp block=1 op=3 loops=0
+104648`t2026-03-12T17:54:26.091 [FFB] Packet type=0x0003
+104649`t2026-03-12T17:54:26.091 [FFB] Condition block=1 axis=X center=0 dead=0 posCoeff=0 negCoeff=0 posSat=10000 negSat=10000
+104650`t2026-03-12T17:54:26.093 [FFB] Packet type=0x0005
+104651`t2026-03-12T17:54:26.093 [FFB] Constant block=1 magnitude=0
+104652`t2026-03-12T17:54:26.094 [FFB] Packet type=0x0005
+104653`t2026-03-12T17:54:26.095 [FFB] Constant block=1 magnitude=0
+104654`t2026-03-12T17:54:26.096 [FFB] Packet type=0x0005
+104655`t2026-03-12T17:54:26.096 [FFB] Constant block=1 magnitude=0
+104656`t2026-03-12T17:54:26.098 [FFB] Packet type=0x0005
+104657`t2026-03-12T17:54:26.099 [FFB] Constant block=1 magnitude=0
+104658`t2026-03-12T17:54:26.099 [RX] seq=  0 x=     4 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 04 00 00 80 00 80 00 00 00 00 bf
+104659`t2026-03-12T17:54:26.100 [FFB] Packet type=0x0005
+104660`t2026-03-12T17:54:26.100 [FFB] Constant block=1 magnitude=0
+104661`t2026-03-12T17:54:26.100 [FFB] Packet type=0x0005
+104662`t2026-03-12T17:54:26.100 [FFB] Constant block=1 magnitude=0
+104663`t2026-03-12T17:54:26.100 [RX] seq=  0 x=     4 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 04 00 00 80 00 80 00 00 00 00 bf
+104664`t2026-03-12T17:54:26.100 [RX] seq=  0 x=     4 y=-32768 z=-32768 buttons=0x00000000 raw=ab 10 00 04 00 00 80 00 80 00 00 00 00 bf
+104665`t2026-03-12T17:54:26.101 [TX] seq= 19 torque=    0 gain=255 pkt=ab 20 13 00 00 ff 00 67 effects_force={1: 0.0} active={1: False} motion={'x_norm': 0.0001, 'x_vel': 0.0, 'x_acc': 0.0}
+104666`t2026-03-12T17:54:26.101 [FFB] Packet type=0x0005
+104667`t2026-03-12T17:54:26.101 [FFB] Constant block=1 magnitude=0
+104668`t2026-03-12T17:54:26.102 [FFB] Packet type=0x0005
+104669`t2026-03-12T17:54:26.102 [FFB] Constant block=1 magnitude=0
+104670`t2026-03-12T17:54:26.103 [FFB] Packet type=0x0005
+104671`t2026-03-12T17:54:26.103 [FFB] Constant block=1 magnitude=0

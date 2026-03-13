@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import datetime
 import math
 import signal
 import sys
@@ -46,6 +47,20 @@ CTRL_STOPALL = 3
 CTRL_DEVRST = 4
 CTRL_DEVPAUSE = 5
 CTRL_DEVCONT = 6
+
+ET_NONE = 0
+# HID PID output packet types (matched by Ffb_h_Type)
+PT_EFFREP   = 0x01   # Set Effect Report
+PT_ENVREP   = 0x02   # Set Envelope Report
+PT_CONDREP  = 0x03   # Set Condition Report
+PT_PRIDREP  = 0x04   # Set Periodic Report
+PT_CONSTREP = 0x05   # Set Constant Force Report
+PT_RAMPREP  = 0x06   # Set Ramp Force Report
+PT_EFOPREP  = 0x0A   # Effect Operation Report
+PT_BLKFRREP = 0x0B   # Block Free Report
+PT_CTRLREP  = 0x0C   # Device Control
+PT_GAINREP  = 0x0D   # Device Gain Report
+PT_NEWEFREP = 0x11   # Create New Effect (Feature report, id 0x01 + 0x10 offset)
 
 ET_NONE = 0
 ET_CONST = 1
@@ -147,6 +162,36 @@ class AxisRange:
     max_val: int
 
 
+class BridgeLogger:
+    def __init__(self, path: str | None) -> None:
+        self.path = path
+        self._lock = threading.Lock()
+        self._file = None
+        if path:
+            # Line-buffered append mode so logs survive abrupt exits.
+            self._file = open(path, "a", encoding="utf-8", buffering=1)
+            self.log("[LOG] ---- bridge session started ----")
+
+    def log(self, message: str) -> None:
+        if not self._file:
+            return
+        ts = datetime.datetime.now().isoformat(timespec="milliseconds")
+        line = f"{ts} {message}"
+        with self._lock:
+            self._file.write(line + "\n")
+
+    def close(self) -> None:
+        if not self._file:
+            return
+        with self._lock:
+            try:
+                self._file.write(f"{datetime.datetime.now().isoformat(timespec='milliseconds')} [LOG] ---- bridge session ended ----\n")
+                self._file.flush()
+            finally:
+                self._file.close()
+                self._file = None
+
+
 class TorqueState:
     def __init__(self, max_torque: int) -> None:
         self.max_torque = max_torque
@@ -228,12 +273,24 @@ class TorqueState:
 
 
 class FFBEffectsManager:
-    # Static tunables (like C/C++ defines): edit here once, no CLI args needed.
+    # Global force scale tunables: edit here, no CLI args needed.
     GLOBAL_FORCE_SCALE = 1.0
     PERIODIC_FORCE_SCALE = 1.0
     CONDITION_FORCE_SCALE = 1.0
-    DEBUG_RAW_PACKET_BYTES = True
-    DEBUG_PER_PACKET = True
+    CONSTANT_OVERLAY_SCALE = 1.0
+
+    # Per-effect scale tunables.
+    CONST_FORCE_SCALE = 1.0
+    RAMP_FORCE_SCALE = 0.5
+    SINE_FORCE_SCALE = 0.5
+    SQUARE_FORCE_SCALE = 0.5
+    TRIANGLE_FORCE_SCALE = 0.5
+    SAW_UP_FORCE_SCALE = 0.5
+    SAW_DOWN_FORCE_SCALE = 0.5
+    SPRING_FORCE_SCALE = 0.5
+    DAMPER_FORCE_SCALE = 0.5
+    INERTIA_FORCE_SCALE = 0.5
+    FRICTION_FORCE_SCALE = 0.5
 
     def __init__(
         self,
@@ -299,14 +356,6 @@ class FFBEffectsManager:
     def _log(self, msg: str) -> None:
         if self.debug_enabled:
             self._log_cb(msg)
-
-    def _arm_block(self, block: int, now: float, reason: str) -> None:
-        if not self._effect_active.get(block, False):
-            self._log(f"AutoStart block={block} reason={reason}")
-        self._effect_active[block] = True
-        if block not in self._effect_start_ts:
-            self._effect_start_ts[block] = now
-        self.torque_state.set_effect_active(block, True)
 
     def _direction_x_scale(self, report: FFB_EFF_REPORT) -> float:
         if bool(report.Polar):
@@ -381,8 +430,6 @@ class FFBEffectsManager:
         block = int(eff_report.EffectBlockIndex)
         self._effect_report[block] = eff_report
         self._effect_type[block] = int(eff_report.EffectType)
-        if block not in self._effect_start_ts:
-            self._effect_start_ts[block] = now
         self._log(
             "EffReport "
             f"block={block} type={self._effect_type_name(eff_report.EffectType)} "
@@ -397,11 +444,23 @@ class FFBEffectsManager:
         block = int(const_eff.EffectBlockIndex)
         mag = self._normalize_signed_10000(const_eff.Magnitude)
         self._constant[block] = mag
-        self._effect_type[block] = ET_CONST
-        self._arm_block(block, now, "constant_packet")
+
+        # Some games (e.g. BeamNG) stream constant force without Effect Report / Effect Op.
+        # Auto-run only this orphan constant path, so ACC-style typed effects keep normal Start/Stop semantics.
+        if block not in self._effect_report:
+            self._effect_type[block] = ET_CONST
+            if mag != 0:
+                self._effect_active[block] = True
+                self._effect_start_ts.setdefault(block, now)
+                self.torque_state.set_effect_active(block, True)
+            else:
+                self._effect_active[block] = False
+                self._effect_start_ts.pop(block, None)
+                self.torque_state.stop_effect_block(block)
+
         self._log(f"Constant block={block} magnitude={mag}")
 
-    def handle_ramp(self, pkt: ctypes.POINTER(FFB_DATA), now: float) -> None:
+    def handle_ramp(self, pkt: ctypes.POINTER(FFB_DATA)) -> None:
         ramp = FFB_EFF_RAMP()
         if self.dll.Ffb_h_Eff_Ramp(pkt, ctypes.byref(ramp)) != ERROR_SUCCESS:
             return
@@ -409,11 +468,11 @@ class FFBEffectsManager:
         start = self._normalize_signed_10000(ramp.Start)
         end = self._normalize_signed_10000(ramp.End)
         self._ramp[block] = (start, end)
-        self._effect_type[block] = ET_RAMP
-        self._arm_block(block, now, "ramp_packet")
+        if block not in self._effect_report:
+            self._effect_type[block] = ET_RAMP
         self._log(f"Ramp block={block} start={start} end={end}")
 
-    def handle_periodic(self, pkt: ctypes.POINTER(FFB_DATA), now: float) -> None:
+    def handle_periodic(self, pkt: ctypes.POINTER(FFB_DATA)) -> None:
         per = FFB_EFF_PERIOD()
         if self.dll.Ffb_h_Eff_Period(pkt, ctypes.byref(per)) != ERROR_SUCCESS:
             return
@@ -421,13 +480,12 @@ class FFBEffectsManager:
         self._periodic[block] = per
         if block in self._effect_report:
             self._effect_type[block] = int(self._effect_report[block].EffectType)
-        self._arm_block(block, now, "periodic_packet")
         self._log(
             f"Periodic block={block} mag={int(per.Magnitude)} off={int(per.Offset)} "
             f"phase={int(per.Phase)} period={int(per.Period)}"
         )
 
-    def handle_condition(self, pkt: ctypes.POINTER(FFB_DATA), now: float) -> None:
+    def handle_condition(self, pkt: ctypes.POINTER(FFB_DATA)) -> None:
         cond = FFB_EFF_COND()
         if self.dll.Ffb_h_Eff_Cond(pkt, ctypes.byref(cond)) != ERROR_SUCCESS:
             return
@@ -438,7 +496,6 @@ class FFBEffectsManager:
         self._condition_x[block] = cond
         if block in self._effect_report:
             self._effect_type[block] = int(self._effect_report[block].EffectType)
-        self._arm_block(block, now, "condition_packet")
         self._log(
             "Condition "
             f"block={block} axis=X center={int(cond.CenterPointOffset)} dead={int(cond.DeadBand)} "
@@ -470,6 +527,7 @@ class FFBEffectsManager:
             self.torque_state.set_effect_active(block, True)
         elif op == EFF_STOP:
             self._effect_active[block] = False
+            self._effect_start_ts.pop(block, None)
             self.torque_state.stop_effect_block(block)
         self._log(f"EffOp block={block} op={op} loops={int(eff_op.LoopCount)}")
 
@@ -506,30 +564,32 @@ class FFBEffectsManager:
             self._log(f"EffNew type={self._effect_type_name(int(eff_type.value))}")
 
     def process_packet(self, pkt: ctypes.POINTER(FFB_DATA), now: float) -> None:
-        if self.DEBUG_PER_PACKET:
-            ptype = ctypes.c_int(0)
-            if self.dll.Ffb_h_Type(pkt, ctypes.byref(ptype)) == ERROR_SUCCESS:
-                self._log(f"Packet type=0x{int(ptype.value) & 0xFFFF:04X}")
-            if self.DEBUG_RAW_PACKET_BYTES:
-                raw_type = ctypes.c_uint16(0)
-                raw_size = ctypes.c_int(0)
-                raw_ptr = ctypes.POINTER(ctypes.c_ubyte)()
-                if self.dll.Ffb_h_Packet(pkt, ctypes.byref(raw_type), ctypes.byref(raw_size), ctypes.byref(raw_ptr)) == ERROR_SUCCESS:
-                    size = max(0, int(raw_size.value))
-                    if size > 0:
-                        raw = ctypes.string_at(raw_ptr, size)
-                        self._log(f"Packet rawType=0x{int(raw_type.value):04X} raw={raw.hex(' ')}")
+        ptype = ctypes.c_int(0)
+        if self.dll.Ffb_h_Type(pkt, ctypes.byref(ptype)) != ERROR_SUCCESS:
+            return
+        t = int(ptype.value) & 0xFFFF
+        self._log(f"Packet type=0x{t:04X}")
 
-        self.handle_effect_new(pkt)
-        self.handle_effect_report(pkt, now)
-        self.handle_constant(pkt, now)
-        self.handle_ramp(pkt, now)
-        self.handle_periodic(pkt, now)
-        self.handle_condition(pkt, now)
-        self.handle_envelope(pkt)
-        self.handle_operation(pkt, now)
-        self.handle_device_control(pkt)
-        self.handle_device_gain(pkt)
+        if t == PT_EFFREP:
+            self.handle_effect_report(pkt, now)
+        elif t == PT_ENVREP:
+            self.handle_envelope(pkt)
+        elif t == PT_CONDREP:
+            self.handle_condition(pkt)
+        elif t == PT_PRIDREP:
+            self.handle_periodic(pkt)
+        elif t == PT_CONSTREP:
+            self.handle_constant(pkt, now)
+        elif t == PT_RAMPREP:
+            self.handle_ramp(pkt)
+        elif t == PT_EFOPREP:
+            self.handle_operation(pkt, now)
+        elif t == PT_CTRLREP:
+            self.handle_device_control(pkt)
+        elif t == PT_GAINREP:
+            self.handle_device_gain(pkt)
+        elif t == PT_NEWEFREP:
+            self.handle_effect_new(pkt)
 
     def tick(self, now: float) -> None:
         _, _, _, motion = self.torque_state.snapshot()
@@ -549,7 +609,6 @@ class FFBEffectsManager:
             x_scale = 1.0
             gain_scale = 1.0
             if report is not None:
-                effect_type = int(self._effect_type.get(block, int(report.EffectType)))
                 duration_ms = int(report.Duration)
                 x_scale = self._direction_x_scale(report)
                 gain_scale = max(0.0, min(1.0, int(report.Gain) / 255.0))
@@ -566,10 +625,11 @@ class FFBEffectsManager:
                 continue
             env_scale = self._envelope_scale(block, now, duration_ms)
             force = 0.0
+            constant_base = self._constant.get(block, 0) / 10000.0
+            constant_overlay = constant_base
 
             if effect_type == ET_CONST:
-                mag = self._constant.get(block, 0)
-                force = (mag / 10000.0) * x_scale
+                force = (constant_base * x_scale) * self.CONST_FORCE_SCALE
             elif effect_type == ET_RAMP:
                 start, end = self._ramp.get(block, (0, 0))
                 if duration_ms in (0, 0xFFFF):
@@ -577,29 +637,41 @@ class FFBEffectsManager:
                 else:
                     k = max(0.0, min(1.0, elapsed_ms / duration_ms))
                     ramp_mag = int(round(start + (end - start) * k))
-                force = (ramp_mag / 10000.0) * x_scale
+                force = (ramp_mag / 10000.0) * x_scale * self.RAMP_FORCE_SCALE
             elif effect_type in (ET_SQR, ET_SINE, ET_TRNGL, ET_STUP, ET_STDN):
                 per = self._periodic.get(block)
                 if per is not None:
+                    wave_scale = self.PERIODIC_FORCE_SCALE
+                    if effect_type == ET_SINE:
+                        wave_scale *= self.SINE_FORCE_SCALE
+                    elif effect_type == ET_SQR:
+                        wave_scale *= self.SQUARE_FORCE_SCALE
+                    elif effect_type == ET_TRNGL:
+                        wave_scale *= self.TRIANGLE_FORCE_SCALE
+                    elif effect_type == ET_STUP:
+                        wave_scale *= self.SAW_UP_FORCE_SCALE
+                    elif effect_type == ET_STDN:
+                        wave_scale *= self.SAW_DOWN_FORCE_SCALE
+
                     period_ms = max(1.0, float(per.Period))
                     phase = (2.0 * math.pi) * (elapsed_ms / period_ms)
                     phase += (2.0 * math.pi) * (float(per.Phase) / 36000.0)
                     wave = self._compute_periodic_wave(effect_type, phase)
                     mag = self._normalize_unsigned_10000(per.Magnitude) / 10000.0
                     off = self._normalize_signed_10000(per.Offset) / 10000.0
-                    force = (off + wave * mag) * x_scale * self.PERIODIC_FORCE_SCALE
+                    force = (off + wave * mag) * x_scale * wave_scale
             elif effect_type == ET_SPRNG:
                 cond = self._condition_x.get(block)
                 if cond is not None:
-                    force = -self._apply_condition_force(cond, motion["x_norm"]) * self.CONDITION_FORCE_SCALE
+                    force = self._apply_condition_force(cond, motion["x_norm"]) * self.CONDITION_FORCE_SCALE * self.SPRING_FORCE_SCALE
             elif effect_type == ET_DMPR:
                 cond = self._condition_x.get(block)
                 if cond is not None:
-                    force = -self._apply_condition_force(cond, motion["x_vel"]) * self.CONDITION_FORCE_SCALE
+                    force = self._apply_condition_force(cond, motion["x_vel"]) * self.CONDITION_FORCE_SCALE * self.DAMPER_FORCE_SCALE
             elif effect_type == ET_INRT:
                 cond = self._condition_x.get(block)
                 if cond is not None:
-                    force = -self._apply_condition_force(cond, motion["x_acc"]) * self.CONDITION_FORCE_SCALE
+                    force = self._apply_condition_force(cond, motion["x_acc"]) * self.CONDITION_FORCE_SCALE * self.INERTIA_FORCE_SCALE
             elif effect_type == ET_FRCTN:
                 cond = self._condition_x.get(block)
                 if cond is not None:
@@ -608,21 +680,15 @@ class FFBEffectsManager:
                         signal = 1.0
                     elif motion["x_vel"] < 0.0:
                         signal = -1.0
-                    force = -self._apply_condition_force(cond, signal) * self.CONDITION_FORCE_SCALE
+                    force = self._apply_condition_force(cond, signal) * self.CONDITION_FORCE_SCALE * self.FRICTION_FORCE_SCALE
+
+            if effect_type != ET_CONST:
+                force += constant_overlay * self.CONSTANT_OVERLAY_SCALE
 
             force *= gain_scale
             force *= env_scale
             force *= self.GLOBAL_FORCE_SCALE
             self.torque_state.set_effect_contribution(block, max(-1.0, min(1.0, force)))
-            self.torque_state.set_effect_active(block, True)
-
-    def snapshot(self) -> dict[str, dict[int, int] | dict[int, bool]]:
-        return {
-            "types": dict(self._effect_type),
-            "active": dict(self._effect_active),
-            "const": dict(self._constant),
-            "ramp": {k: v[1] for k, v in self._ramp.items()},
-        }
 
 
 class VJoyBridge:
@@ -631,21 +697,27 @@ class VJoyBridge:
         dll_path: str | None,
         vjoy_id: int,
         torque_state: TorqueState,
+        logger: BridgeLogger | None = None,
         debug_ffb: bool = False,
         debug_print_interval: float = 0.05,
     ) -> None:
         self.vjoy_id = vjoy_id
         self.torque_state = torque_state
+        self.logger = logger
         self.debug_ffb = debug_ffb
         self.debug_print_interval = max(0.0, float(debug_print_interval))
         self._last_ffb_debug_ts = 0.0
         self.dll = self._load_dll(dll_path)
         self._setup_prototypes()
-        self.effects = FFBEffectsManager(self.dll, self.torque_state, self._log_ffb, self.debug_ffb)
+        ffb_debug_enabled = self.debug_ffb or (self.logger is not None)
+        self.effects = FFBEffectsManager(self.dll, self.torque_state, self._log_ffb, ffb_debug_enabled)
         self._ffb_cb_ref = None
         self.axis_ranges: dict[int, AxisRange] = {}
 
     def _log_ffb(self, msg: str) -> None:
+        if self.logger is not None:
+            self.logger.log(f"[FFB] {msg}")
+
         if not self.debug_ffb:
             return
         now = time.monotonic()
@@ -734,14 +806,6 @@ class VJoyBridge:
 
         d.Ffb_h_Type.argtypes = [ctypes.POINTER(FFB_DATA), ctypes.POINTER(ctypes.c_int)]
         d.Ffb_h_Type.restype = ctypes.c_uint32
-
-        d.Ffb_h_Packet.argtypes = [
-            ctypes.POINTER(FFB_DATA),
-            ctypes.POINTER(ctypes.c_uint16),
-            ctypes.POINTER(ctypes.c_int),
-            ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)),
-        ]
-        d.Ffb_h_Packet.restype = ctypes.c_uint32
 
         # FfbGenCB signature: void CALLBACK cb(PVOID data, PVOID userdata)
         self._cb_type = ctypes.WINFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p)
@@ -879,11 +943,13 @@ def open_serial(args: argparse.Namespace) -> serial.Serial:
 
 
 def run(args: argparse.Namespace) -> int:
+    logger = BridgeLogger(args.log_file)
     torque_state = TorqueState(max_torque=args.max_torque)
     vjoy = VJoyBridge(
         args.vjoy_dll,
         args.vjoy_id,
         torque_state,
+        logger=logger,
         debug_ffb=args.debug_ffb,
         debug_print_interval=args.debug_print_interval,
     )
@@ -899,6 +965,9 @@ def run(args: argparse.Namespace) -> int:
 
     vjoy.start()
     print(f"Bridge iniciado. Serial={args.port} vJoyID={args.vjoy_id}")
+    if logger.path:
+        print(f"Logging detallado en: {logger.path}")
+        logger.log(f"[RUN] start serial={args.port} baud={args.baud} vjoy_id={args.vjoy_id}")
 
     rx = bytearray()
     tx_seq = 0
@@ -926,7 +995,15 @@ def run(args: argparse.Namespace) -> int:
                     torque_state.update_motion(x)
                     vjoy.update_axes_buttons(x, y, z, buttons)
                     last_axes = (x, y, z)
+                    if logger.path:
+                        logger.log(
+                            "[RX] "
+                            f"seq={_seq:3d} x={x:6d} y={y:6d} z={z:6d} "
+                            f"buttons=0x{buttons:08X} raw={frame.hex(' ')}"
+                        )
                 except ValueError:
+                    if logger.path:
+                        logger.log(f"[RX_ERR] invalid telemetry frame raw={frame.hex(' ')}")
                     del rx[0]
                     continue
                 del rx[:TELEMETRY_LEN]
@@ -936,6 +1013,18 @@ def run(args: argparse.Namespace) -> int:
             torque = torque_state.compute_torque()
             tx_pkt = build_torque_packet(tx_seq, torque, 255, 0)
             ser.write(tx_pkt)
+
+            if logger.path:
+                dev_gain, eff_force, eff_active, motion = torque_state.snapshot()
+                logger.log(
+                    "[TX] "
+                    f"seq={tx_seq:3d} torque={torque:5d} gain={dev_gain:3d} "
+                    f"pkt={tx_pkt.hex(' ')} "
+                    f"effects_force={ {k: round(v, 4) for k, v in eff_force.items()} } "
+                    f"active={eff_active} "
+                    f"motion={ {k: round(v, 4) for k, v in motion.items()} }"
+                )
+
             tx_seq = (tx_seq + 1) & 0xFF
 
             if args.debug_tx:
@@ -969,6 +1058,9 @@ def run(args: argparse.Namespace) -> int:
         except Exception:
             pass
         vjoy.stop()
+        if logger.path:
+            logger.log("[RUN] stop")
+        logger.close()
         print("Bridge detenido.")
 
     return 0
@@ -985,6 +1077,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--startup-delay", type=float, default=1.2, help="Espera tras abrir COM para evitar resets (s)")
     p.add_argument("--debug-ffb", action="store_true", help="Imprime paquetes/estado FFB que llegan desde vJoy")
     p.add_argument("--debug-tx", action="store_true", help="Imprime paquetes de torque enviados al ESP")
+    p.add_argument("--log-file", default=None, help="Archivo log detallado (sin throttling). Ej: log.txt")
     p.add_argument("--debug-print-interval", type=float, default=0.05, help="Intervalo minimo entre prints de debug (s)")
     p.add_argument("--verbose", action="store_true", help="Imprime telemetria/torque cada 200ms")
     return p
