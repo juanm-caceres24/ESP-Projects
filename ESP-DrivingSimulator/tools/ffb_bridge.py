@@ -24,57 +24,56 @@ from typing import Callable
 import serial
 
 
-BRIDGE_START = 0xAB
-PKT_TELEMETRY = 0x10
-PKT_TORQUE = 0x20
+BRIDGE_START    = 0xAB
+PKT_TELEMETRY   = 0x10
+PKT_TORQUE      = 0x20
 
-TELEMETRY_LEN = 14
-TORQUE_LEN = 8
+TELEMETRY_LEN   = 14
+TORQUE_LEN      = 8
 
-HID_USAGE_X = 0x30
-HID_USAGE_Y = 0x31
-HID_USAGE_Z = 0x32
+HID_USAGE_X     = 0x30
+HID_USAGE_Y     = 0x31
+HID_USAGE_Z     = 0x32
 
-ERROR_SUCCESS = 0
+ERROR_SUCCESS   = 0
 
-EFF_START = 1
-EFF_SOLO = 2
-EFF_STOP = 3
+EFF_START       = 1
+EFF_SOLO        = 2
+EFF_STOP        = 3
 
-CTRL_ENACT = 1
-CTRL_DISACT = 2
-CTRL_STOPALL = 3
-CTRL_DEVRST = 4
-CTRL_DEVPAUSE = 5
-CTRL_DEVCONT = 6
+CTRL_ENACT      = 1
+CTRL_DISACT     = 2
+CTRL_STOPALL    = 3
+CTRL_DEVRST     = 4
+CTRL_DEVPAUSE   = 5
+CTRL_DEVCONT    = 6
 
-ET_NONE = 0
 # HID PID output packet types (matched by Ffb_h_Type)
-PT_EFFREP   = 0x01   # Set Effect Report
-PT_ENVREP   = 0x02   # Set Envelope Report
-PT_CONDREP  = 0x03   # Set Condition Report
-PT_PRIDREP  = 0x04   # Set Periodic Report
-PT_CONSTREP = 0x05   # Set Constant Force Report
-PT_RAMPREP  = 0x06   # Set Ramp Force Report
-PT_EFOPREP  = 0x0A   # Effect Operation Report
-PT_BLKFRREP = 0x0B   # Block Free Report
-PT_CTRLREP  = 0x0C   # Device Control
-PT_GAINREP  = 0x0D   # Device Gain Report
-PT_NEWEFREP = 0x11   # Create New Effect (Feature report, id 0x01 + 0x10 offset)
+PT_EFFREP       = 0x01  # Set Effect Report
+PT_ENVREP       = 0x02  # Set Envelope Report
+PT_CONDREP      = 0x03  # Set Condition Report
+PT_PRIDREP      = 0x04  # Set Periodic Report
+PT_CONSTREP     = 0x05  # Set Constant Force Report
+PT_RAMPREP      = 0x06  # Set Ramp Force Report
+PT_EFOPREP      = 0x0A  # Effect Operation Report
+PT_BLKFRREP     = 0x0B  # Block Free Report
+PT_CTRLREP      = 0x0C  # Device Control
+PT_GAINREP      = 0x0D  # Device Gain Report
+PT_NEWEFREP     = 0x11  # Create New Effect (Feature report, id 0x01 + 0x10 offset)
 
-ET_NONE = 0
-ET_CONST = 1
-ET_RAMP = 2
-ET_SQR = 3
-ET_SINE = 4
-ET_TRNGL = 5
-ET_STUP = 6
-ET_STDN = 7
-ET_SPRNG = 8
-ET_DMPR = 9
-ET_INRT = 10
-ET_FRCTN = 11
-ET_CSTM = 12
+ET_NONE         = 0
+ET_CONST        = 1
+ET_RAMP         = 2
+ET_SQR          = 3
+ET_SINE         = 4
+ET_TRNGL        = 5
+ET_STUP         = 6
+ET_STDN         = 7
+ET_SPRNG        = 8
+ET_DMPR         = 9
+ET_INRT         = 10
+ET_FRCTN        = 11
+ET_CSTM         = 12
 
 
 class FFB_DATA(ctypes.Structure):
@@ -274,23 +273,23 @@ class TorqueState:
 
 class FFBEffectsManager:
     # Global force scale tunables: edit here, no CLI args needed.
-    GLOBAL_FORCE_SCALE = 1.0
-    PERIODIC_FORCE_SCALE = 1.0
-    CONDITION_FORCE_SCALE = 1.0
-    CONSTANT_OVERLAY_SCALE = 1.0
+    GLOBAL_FORCE_SCALE      = 1.0
+    PERIODIC_FORCE_SCALE    = 1.0
+    CONDITION_FORCE_SCALE   = 1.0
+    CONSTANT_OVERLAY_SCALE  = 1.0
 
     # Per-effect scale tunables.
-    CONST_FORCE_SCALE = 1.0
-    RAMP_FORCE_SCALE = 0.5
-    SINE_FORCE_SCALE = 0.5
-    SQUARE_FORCE_SCALE = 0.5
-    TRIANGLE_FORCE_SCALE = 0.5
-    SAW_UP_FORCE_SCALE = 0.5
-    SAW_DOWN_FORCE_SCALE = 0.5
-    SPRING_FORCE_SCALE = 0.5
-    DAMPER_FORCE_SCALE = 0.5
-    INERTIA_FORCE_SCALE = 0.5
-    FRICTION_FORCE_SCALE = 0.5
+    CONST_FORCE_SCALE       = 1.0
+    RAMP_FORCE_SCALE        = 0.5
+    SINE_FORCE_SCALE        = 0.5
+    SQUARE_FORCE_SCALE      = 0.5
+    TRIANGLE_FORCE_SCALE    = 0.5
+    SAW_UP_FORCE_SCALE      = 0.5
+    SAW_DOWN_FORCE_SCALE    = 0.5
+    SPRING_FORCE_SCALE      = 0.5
+    DAMPER_FORCE_SCALE      = 0.5
+    INERTIA_FORCE_SCALE     = 0.5
+    FRICTION_FORCE_SCALE    = 0.5
 
     def __init__(
         self,
@@ -317,10 +316,10 @@ class FFBEffectsManager:
 
     @staticmethod
     def _normalize_signed_10000(value: int) -> int:
-        mag = int(value)
-        if mag > 32767:
-            mag -= 65536
-        return max(-10000, min(10000, mag))
+        v = int(value)
+        if v > 32767:
+            v -= 65536
+        return max(-10000, min(10000, v))
 
     @staticmethod
     def _normalize_unsigned_10000(value: int) -> int:
@@ -337,19 +336,19 @@ class FFBEffectsManager:
     @staticmethod
     def _effect_type_name(effect_type: int) -> str:
         names = {
-            ET_NONE: "none",
-            ET_CONST: "constant",
-            ET_RAMP: "ramp",
-            ET_SQR: "square",
-            ET_SINE: "sine",
-            ET_TRNGL: "triangle",
-            ET_STUP: "sawtooth_up",
-            ET_STDN: "sawtooth_down",
-            ET_SPRNG: "spring",
-            ET_DMPR: "damper",
-            ET_INRT: "inertia",
-            ET_FRCTN: "friction",
-            ET_CSTM: "custom",
+            ET_NONE:    "none",
+            ET_CONST:   "constant",
+            ET_RAMP:    "ramp",
+            ET_SQR:     "square",
+            ET_SINE:    "sine",
+            ET_TRNGL:   "triangle",
+            ET_STUP:    "sawtooth_up",
+            ET_STDN:    "sawtooth_down",
+            ET_SPRNG:   "spring",
+            ET_DMPR:    "damper",
+            ET_INRT:    "inertia",
+            ET_FRCTN:   "friction",
+            ET_CSTM:    "custom",
         }
         return names.get(int(effect_type), f"unknown_{int(effect_type)}")
 
@@ -626,7 +625,6 @@ class FFBEffectsManager:
             env_scale = self._envelope_scale(block, now, duration_ms)
             force = 0.0
             constant_base = self._constant.get(block, 0) / 10000.0
-            constant_overlay = constant_base
 
             if effect_type == ET_CONST:
                 force = (constant_base * x_scale) * self.CONST_FORCE_SCALE
@@ -683,7 +681,7 @@ class FFBEffectsManager:
                     force = self._apply_condition_force(cond, signal) * self.CONDITION_FORCE_SCALE * self.FRICTION_FORCE_SCALE
 
             if effect_type != ET_CONST:
-                force += constant_overlay * self.CONSTANT_OVERLAY_SCALE
+                force += constant_base * self.CONSTANT_OVERLAY_SCALE
 
             force *= gain_scale
             force *= env_scale
@@ -1028,8 +1026,7 @@ def run(args: argparse.Namespace) -> int:
             tx_seq = (tx_seq + 1) & 0xFF
 
             if args.debug_tx:
-                now_dbg = time.monotonic()
-                if (now_dbg - last_tx_debug) >= args.debug_print_interval:
+                if (now - last_tx_debug) >= args.debug_print_interval:
                     dev_gain, eff_force, eff_active, motion = torque_state.snapshot()
                     print(
                         "[TX] "
@@ -1040,7 +1037,7 @@ def run(args: argparse.Namespace) -> int:
                         f"motion={ {k: round(v, 4) for k, v in motion.items()} }",
                         flush=True,
                     )
-                    last_tx_debug = now_dbg
+                    last_tx_debug = now
 
             if args.verbose and now - last_print >= 0.2:
                 print(
