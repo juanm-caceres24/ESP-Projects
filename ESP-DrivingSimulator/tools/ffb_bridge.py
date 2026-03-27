@@ -192,8 +192,21 @@ class BridgeLogger:
 
 
 class TorqueState:
-    def __init__(self, max_torque: int) -> None:
-        self.max_torque = max_torque
+    def __init__(
+        self,
+        max_torque: int,
+        min_torque: int = 0,
+        use_min_torque_comp: bool = False,
+        input_deadzone: int = 0,
+        min_torque_input: int = 0,
+        torque_response_gamma: float = 1.0,
+    ) -> None:
+        self.max_torque = max(1, int(max_torque))
+        self.min_torque = max(0, int(min_torque))
+        self.use_min_torque_comp = bool(use_min_torque_comp)
+        self.input_deadzone = max(0, int(input_deadzone))
+        self.min_torque_input = max(0, int(min_torque_input))
+        self.torque_response_gamma = max(0.1, float(torque_response_gamma))
         self.device_gain = 255
         self._effect_contribution: dict[int, float] = {}
         self._effect_active: dict[int, bool] = {}
@@ -268,10 +281,40 @@ class TorqueState:
 
         # Invert output sign to match this wheel's motor/driver direction.
         torque = -torque
-        return max(-self.max_torque, min(self.max_torque, torque))
+
+        # Optional low-force compensation so small FFB values can overcome motor/driver stiction.
+        if torque == 0:
+            return 0
+
+        sign = 1 if torque > 0 else -1
+        mag = max(0, min(self.max_torque, abs(int(torque))))
+
+        if mag <= self.input_deadzone:
+            return 0
+
+        if self.use_min_torque_comp and self.min_torque > 0 and self.min_torque < self.max_torque:
+            in_start = max(0, min(self.max_torque, self.min_torque_input))
+            if mag <= in_start:
+                mag = self.min_torque
+            else:
+                in_span = max(1, self.max_torque - in_start)
+                norm = max(0.0, min(1.0, (mag - in_start) / in_span))
+                norm = norm ** self.torque_response_gamma
+                out_span = self.max_torque - self.min_torque
+                mag = int(round(self.min_torque + (norm * out_span)))
+
+        return sign * max(0, min(self.max_torque, mag))
 
 
 class FFBEffectsManager:
+    # Torque output tunables: edit these to match your wheel motor/driver behavior.
+    MAX_TORQUE              = 300
+    USE_MIN_TORQUE_COMP     = True
+    MIN_TORQUE              = 160
+    INPUT_DEADZONE          = 5
+    MIN_TORQUE_INPUT        = 0
+    TORQUE_RESPONSE_GAMMA   = 1.0
+
     # Global force scale tunables: edit here, no CLI args needed.
     GLOBAL_FORCE_SCALE      = 1.0
     PERIODIC_FORCE_SCALE    = 1.0
@@ -539,6 +582,10 @@ class FFBEffectsManager:
         if c == CTRL_STOPALL:
             self._effect_active = {k: False for k in self._effect_active}
             self.torque_state.clear_all_effects()
+        elif c == CTRL_ENACT:
+            self._device_paused = False
+        elif c == CTRL_DISACT:
+            self._device_paused = True
         elif c == CTRL_DEVRST:
             self._effect_active.clear()
             self._effect_start_ts.clear()
@@ -587,6 +634,8 @@ class FFBEffectsManager:
             self.handle_device_control(pkt)
         elif t == PT_GAINREP:
             self.handle_device_gain(pkt)
+        elif t == PT_BLKFRREP:
+            self._log("BlockFree report received")
         elif t == PT_NEWEFREP:
             self.handle_effect_new(pkt)
 
@@ -942,7 +991,14 @@ def open_serial(args: argparse.Namespace) -> serial.Serial:
 
 def run(args: argparse.Namespace) -> int:
     logger = BridgeLogger(args.log_file)
-    torque_state = TorqueState(max_torque=args.max_torque)
+    torque_state = TorqueState(
+        max_torque=FFBEffectsManager.MAX_TORQUE,
+        min_torque=FFBEffectsManager.MIN_TORQUE,
+        use_min_torque_comp=FFBEffectsManager.USE_MIN_TORQUE_COMP,
+        input_deadzone=FFBEffectsManager.INPUT_DEADZONE,
+        min_torque_input=FFBEffectsManager.MIN_TORQUE_INPUT,
+        torque_response_gamma=FFBEffectsManager.TORQUE_RESPONSE_GAMMA,
+    )
     vjoy = VJoyBridge(
         args.vjoy_dll,
         args.vjoy_id,
@@ -963,6 +1019,16 @@ def run(args: argparse.Namespace) -> int:
 
     vjoy.start()
     print(f"Bridge iniciado. Serial={args.port} vJoyID={args.vjoy_id}")
+    print(
+        "[TUNE] "
+        f"MAX_TORQUE={torque_state.max_torque} "
+        f"MIN_COMP={'on' if torque_state.use_min_torque_comp else 'off'} "
+        f"MIN_TORQUE={torque_state.min_torque} "
+        f"DEADZONE={torque_state.input_deadzone} "
+        f"MIN_INPUT={torque_state.min_torque_input} "
+        f"GAMMA={torque_state.torque_response_gamma}",
+        flush=True,
+    )
     if logger.path:
         print(f"Logging detallado en: {logger.path}")
         logger.log(f"[RUN] start serial={args.port} baud={args.baud} vjoy_id={args.vjoy_id}")
@@ -972,6 +1038,12 @@ def run(args: argparse.Namespace) -> int:
     last_print = time.monotonic()
     last_axes = (0, 0, 0)
     last_tx_debug = 0.0
+    forced_torque = None
+    if args.force_torque is not None:
+        forced_torque = max(-32768, min(32767, int(args.force_torque)))
+        print(f"[TEST] Modo torque fijo activo: torque={forced_torque}", flush=True)
+        if logger.path:
+            logger.log(f"[TEST] constant_torque_enabled torque={forced_torque}")
 
     try:
         while not stop_event.is_set():
@@ -1008,7 +1080,10 @@ def run(args: argparse.Namespace) -> int:
 
             now = time.monotonic()
             vjoy.tick_effects(now)
-            torque = torque_state.compute_torque()
+            if forced_torque is None:
+                torque = torque_state.compute_torque()
+            else:
+                torque = forced_torque
             tx_pkt = build_torque_packet(tx_seq, torque, 255, 0)
             ser.write(tx_pkt)
 
@@ -1069,7 +1144,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--baud", type=int, default=115200, help="Baudrate serial")
     p.add_argument("--vjoy-id", type=int, default=1, help="ID del dispositivo vJoy")
     p.add_argument("--vjoy-dll", default=None, help="Ruta a vJoyInterface.dll")
-    p.add_argument("--max-torque", type=int, default=1000, help="Torque maximo enviado al ESP")
     p.add_argument("--loop-sleep", type=float, default=0.002, help="Sleep del loop principal (s)")
     p.add_argument("--startup-delay", type=float, default=1.2, help="Espera tras abrir COM para evitar resets (s)")
     p.add_argument("--debug-ffb", action="store_true", help="Imprime paquetes/estado FFB que llegan desde vJoy")
@@ -1077,6 +1151,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--log-file", default=None, help="Archivo log detallado (sin throttling). Ej: log.txt")
     p.add_argument("--debug-print-interval", type=float, default=0.05, help="Intervalo minimo entre prints de debug (s)")
     p.add_argument("--verbose", action="store_true", help="Imprime telemetria/torque cada 200ms")
+    p.add_argument("--force-torque", type=int, default=None, help="Si se define, ignora FFB y envia este torque constante (int16) al ESP")
     return p
 
 
