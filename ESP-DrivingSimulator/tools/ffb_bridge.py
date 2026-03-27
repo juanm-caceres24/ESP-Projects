@@ -280,7 +280,7 @@ class TorqueState:
         torque = int(round(scaled))
 
         # Invert output sign to match this wheel's motor/driver direction.
-        torque = -torque
+        torque = torque
 
         # Optional low-force compensation so small FFB values can overcome motor/driver stiction.
         if torque == 0:
