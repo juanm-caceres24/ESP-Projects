@@ -1,10 +1,8 @@
 #include <Arduino.h>
 
-// Default values used on startup.
 const uint32_t DEFAULT_ITERATIONS = 70460000;
 const uint32_t CPU_FREQ_MHZ[] = {80, 160, 240};
 const size_t CPU_FREQ_COUNT = sizeof(CPU_FREQ_MHZ) / sizeof(CPU_FREQ_MHZ[0]);
-// Volatile counter to prevent compiler optimizations.
 volatile uint32_t counter = 0;
 volatile uint32_t requested_freq_mhz = CPU_FREQ_MHZ[0];
 volatile uint32_t requested_iterations = DEFAULT_ITERATIONS;
