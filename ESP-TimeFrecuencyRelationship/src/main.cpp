@@ -9,7 +9,6 @@ volatile uint32_t requested_iterations = DEFAULT_ITERATIONS;
 volatile unsigned long long start_time_us = 0;
 volatile unsigned long long end_time_us = 0;
 volatile unsigned long long total_time_us = 0;
-volatile bool freq_ok = false;
 
 static void runBenchmark(uint32_t freqMHz, uint32_t iterations) {
     requested_freq_mhz = freqMHz;
