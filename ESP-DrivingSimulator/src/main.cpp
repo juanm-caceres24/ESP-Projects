@@ -23,6 +23,16 @@
 #define MSG_TYPE_ENCODER 0x02 // -NOT CURRENTLY USED-
 #define MSG_TYPE_ANALOG 0x03 // -NOT CURRENTLY USED-
 
+// Matrix keypad pins and settings.
+#define KEYPAD_ROW_0 8
+#define KEYPAD_ROW_1 9
+#define KEYPAD_ROW_2 10
+#define KEYPAD_ROW_3 11
+#define KEYPAD_COL_0 1
+#define KEYPAD_COL_1 2
+#define KEYPAD_COL_2 21
+#define KEYPAD_COL_3 47
+
 // USB CDC bridge packet settings (ESP <-> Python app).
 #define BRIDGE_START_BYTE 0xAB
 #define BRIDGE_PKT_TELEMETRY 0x10
@@ -129,7 +139,6 @@ void encoder_init() {
     pcnt_config_ch0.counter_h_lim = 32767;
     pcnt_config_ch0.counter_l_lim = -32768;
     pcnt_unit_config(&pcnt_config_ch0);
-
     pcnt_config_t pcnt_config_ch1 = {};
     pcnt_config_ch1.pulse_gpio_num = ENCODER_PIN_B;
     pcnt_config_ch1.ctrl_gpio_num = ENCODER_PIN_A;
@@ -142,7 +151,6 @@ void encoder_init() {
     pcnt_config_ch1.counter_h_lim = 32767;
     pcnt_config_ch1.counter_l_lim = -32768;
     pcnt_unit_config(&pcnt_config_ch1);
-
     pcnt_counter_pause(PCNT_UNIT_USED);
     pcnt_counter_clear(PCNT_UNIT_USED);
     pcnt_counter_resume(PCNT_UNIT_USED);
@@ -193,7 +201,6 @@ void update_position() {
 void hall_calib() {
     LOG("Calibrating...");
     delay(4000);
-
     for (int i = 0; i < CALIB_SAMPLES; i++) {
         hall_accel_val = analogRead(HALL_ACCEL_PIN);
         if (hall_accel_val > hall_accel_min) {
@@ -205,7 +212,6 @@ void hall_calib() {
         }
         delay(CALIB_DELAY_BETWEEN_SAMPLES);
     }
-
     delay(4000);
     for (int i = 0; i < CALIB_SAMPLES; i++) {
         hall_accel_val = analogRead(HALL_ACCEL_PIN);
@@ -218,7 +224,6 @@ void hall_calib() {
         }
         delay(CALIB_DELAY_BETWEEN_SAMPLES);
     }
-
     LOG("Calibration done.");
 }
 
@@ -238,7 +243,6 @@ void process_secondary_packet(uint8_t *packet) {
     uint8_t type = packet[1];
     uint8_t id = packet[2];
     uint16_t value = packet[3] | (packet[4] << 8);
-
     switch (type) {
         case MSG_TYPE_BUTTON:
             if (id == 0) {
@@ -301,7 +305,6 @@ void process_bridge_packet(const uint8_t* pkt, uint8_t len) {
     if (len < 4) {
         return;
     }
-
     const uint8_t type = pkt[1];
     if (type == BRIDGE_PKT_TORQUE_CMD && len >= 8) {
         int16_t torque = (int16_t)((uint16_t)pkt[3] | ((uint16_t)pkt[4] << 8));
@@ -314,7 +317,6 @@ void process_bridge_packet(const uint8_t* pkt, uint8_t len) {
 void handle_bridge_serial() {
     while (Serial.available()) {
         uint8_t b = (uint8_t)Serial.read();
-
         if (bridge_rx_idx == 0) {
             if (b == BRIDGE_START_BYTE) {
                 bridge_rx_buf[bridge_rx_idx++] = b;
@@ -322,15 +324,12 @@ void handle_bridge_serial() {
             }
             continue;
         }
-
         if (bridge_rx_idx >= sizeof(bridge_rx_buf)) {
             bridge_rx_idx = 0;
             bridge_rx_expected = 0;
             continue;
         }
-
         bridge_rx_buf[bridge_rx_idx++] = b;
-
         if (bridge_rx_idx == 2) {
             bridge_rx_expected = bridge_packet_len(bridge_rx_buf[1]);
             if (bridge_rx_expected == 0 || bridge_rx_expected > sizeof(bridge_rx_buf)) {
@@ -339,7 +338,6 @@ void handle_bridge_serial() {
             }
             continue;
         }
-
         if (bridge_rx_expected > 0 && bridge_rx_idx >= bridge_rx_expected) {
             uint8_t crc_recv = bridge_rx_buf[bridge_rx_expected - 1];
             uint8_t crc_calc = calculate_crc_xor(bridge_rx_buf, bridge_rx_expected - 1);
@@ -357,20 +355,17 @@ void send_bridge_telemetry() {
     pkt[0] = BRIDGE_START_BYTE;
     pkt[1] = BRIDGE_PKT_TELEMETRY;
     pkt[2] = 0; // Reserved for sequence number.
-
     pkt[3] = (uint8_t)(joyX & 0xFF);
     pkt[4] = (uint8_t)((joyX >> 8) & 0xFF);
     pkt[5] = (uint8_t)(joyY & 0xFF);
     pkt[6] = (uint8_t)((joyY >> 8) & 0xFF);
     pkt[7] = (uint8_t)(joyZ & 0xFF);
     pkt[8] = (uint8_t)((joyZ >> 8) & 0xFF);
-
     pkt[9] = (uint8_t)(hid_buttons & 0xFF);
     pkt[10] = (uint8_t)((hid_buttons >> 8) & 0xFF);
     pkt[11] = (uint8_t)((hid_buttons >> 16) & 0xFF);
     pkt[12] = (uint8_t)((hid_buttons >> 24) & 0xFF);
     pkt[13] = calculate_crc_xor(pkt, 13);
-
     Serial.write(pkt, sizeof(pkt));
 }
 
@@ -381,7 +376,6 @@ void send_bridge_telemetry() {
 int16_t get_pos_PID(int32_t target_position) {
     uint32_t dt_us = (ffb_position_time_us - ffb_last_position_time_us);
     int32_t ffb_position_error = target_position - ffb_position;
-
     if (dt_us > 0) {
         ffb_position_integral += ffb_position_error * dt_us;
         ffb_position_integral = constrain(ffb_position_integral, -FFB_POS_I_LIMIT, FFB_POS_I_LIMIT);
@@ -389,7 +383,6 @@ int16_t get_pos_PID(int32_t target_position) {
     } else {
         ffb_position_derivative = 0.0f;
     }
-
     ffb_last_position_error = ffb_position_error;
     return constrain(FFB_POS_KP * ffb_position_error + FFB_POS_KI * ffb_position_integral + FFB_POS_KD * ffb_position_derivative, -FFB_ABS_MAX_VAL, FFB_ABS_MAX_VAL);
 }
@@ -407,16 +400,12 @@ void reset_position_pid_state() {
 void motor_init() {
     pinMode(BTS_REN_PIN, OUTPUT);
     pinMode(BTS_LEN_PIN, OUTPUT);
-
     digitalWrite(BTS_REN_PIN, HIGH);
     digitalWrite(BTS_LEN_PIN, HIGH);
-
     ledcSetup(BTS_PWM_CH_R, BTS_PWM_FREQ, BTS_PWM_RES_BITS);
     ledcSetup(BTS_PWM_CH_L, BTS_PWM_FREQ, BTS_PWM_RES_BITS);
-
     ledcAttachPin(BTS_RPWM_PIN, BTS_PWM_CH_R);
     ledcAttachPin(BTS_LPWM_PIN, BTS_PWM_CH_L);
-
     ledcWrite(BTS_PWM_CH_R, 0);
     ledcWrite(BTS_PWM_CH_L, 0);
 }
@@ -425,11 +414,9 @@ void set_motor_torque(int16_t torque_val) {
     torque_val = constrain(torque_val, -FFB_ABS_MAX_VAL, FFB_ABS_MAX_VAL);
     int32_t scaled = (int32_t)torque_val * ffb_device_gain / 255;
     int pwm = map(abs((int)scaled), 0, FFB_ABS_MAX_VAL, 0, BTS_PWM_MAX);
-
     if (pwm < FFB_DEADZONE) {
         pwm = 0;
     }
-
     if (scaled > 0) {
         ledcWrite(BTS_PWM_CH_R, pwm);
         ledcWrite(BTS_PWM_CH_L, 0);
@@ -447,14 +434,12 @@ void motor_self_test() {
     uint32_t hold_position_time = 0;
     uint8_t last_holding_position_flag = false;
     int16_t target_position = -WHEEL_MAX_POSITION;
-
     reset_position_pid_state();
     while (true) {
         update_position();
         float pid_output = get_pos_PID(target_position);
         int16_t torque_command = (int16_t)constrain(pid_output, -MOTOR_SELF_TEST_TORQUE_LIMIT, MOTOR_SELF_TEST_TORQUE_LIMIT);
         set_motor_torque(torque_command);
-
         int16_t position_error = target_position - ffb_position;
         if (abs(position_error) <= MOTOR_SELF_TEST_POS_TOL) {
             if (!last_holding_position_flag) {
@@ -467,26 +452,22 @@ void motor_self_test() {
         } else {
             last_holding_position_flag = false;
         }
-
         if (millis() - start_time > MOTOR_SELF_TEST_TIMEOUT_MS) {
             LOG("Motor self-test failed: timeout reached.");
             break;
         }
         delay(10);
     }
-
     start_time = millis();
     hold_position_time = 0;
     last_holding_position_flag = false;
     target_position = WHEEL_MAX_POSITION;
     reset_position_pid_state();
-
     while (true) {
         update_position();
         float pid_output = get_pos_PID(target_position);
         int16_t torque_command = (int16_t)constrain(pid_output, -MOTOR_SELF_TEST_TORQUE_LIMIT, MOTOR_SELF_TEST_TORQUE_LIMIT);
         set_motor_torque(torque_command);
-
         int16_t position_error = target_position - ffb_position;
         if (abs(position_error) <= MOTOR_SELF_TEST_POS_TOL) {
             if (!last_holding_position_flag) {
@@ -499,26 +480,22 @@ void motor_self_test() {
         } else {
             last_holding_position_flag = false;
         }
-
         if (millis() - start_time > MOTOR_SELF_TEST_TIMEOUT_MS) {
             LOG("Motor self-test failed: timeout reached.");
             break;
         }
         delay(10);
     }
-
     start_time = millis();
     target_position = 0;
     hold_position_time = 0;
     last_holding_position_flag = false;
     reset_position_pid_state();
-
     while (true) {
         update_position();
         float pid_output = get_pos_PID(target_position);
         int16_t torque_command = (int16_t)constrain(pid_output, -MOTOR_SELF_TEST_TORQUE_LIMIT, MOTOR_SELF_TEST_TORQUE_LIMIT);
         set_motor_torque(torque_command);
-
         int16_t position_error = target_position - ffb_position;
         if (abs(position_error) <= MOTOR_SELF_TEST_POS_TOL) {
             if (!last_holding_position_flag) {
@@ -531,7 +508,6 @@ void motor_self_test() {
         } else {
             last_holding_position_flag = false;
         }
-
         if (millis() - start_time > MOTOR_SELF_TEST_TIMEOUT_MS) {
             LOG("Motor self-test failed: timeout reached.");
             break;
@@ -543,42 +519,32 @@ void motor_self_test() {
 void setup() {
     // USB CDC serial is now the only host interface (no HID joystick descriptor).
     Serial.begin(115200);
-
     // Secondary UART communication for external buttons/controls.
     Serial1.begin(UART_BAUD, SERIAL_8N1, RXD1, TXD1);
-
     encoder_init();
     hall_init();
     hall_calib();
     motor_init();
     motor_self_test();
-
     pcnt_get_counter_value(PCNT_UNIT_USED, &ffb_position);
 }
 
 void loop() {
     handle_secondary_uart();
     handle_bridge_serial();
-
     update_position();
-
     joyX = get_wheel_position();
     joyY = get_accel_position();
     joyZ = get_brake_position();
-
     uint32_t now = millis();
-
     set_motor_torque(ffb_torque_value);
-
     if ((uint32_t)(now - last_bridge_telem_ms) >= BRIDGE_TELEMETRY_INTERVAL_MS) {
         last_bridge_telem_ms = now;
         send_bridge_telemetry();
     }
-
     if ((uint32_t)(now - last_debug_ms) >= DEBUG_TELEMETRY_INTERVAL_MS) {
         last_debug_ms = now;
         LOGF("X:%6d raw:%6d Y:%6d Z:%6d torque:%5d gain:%3d\n", joyX, ffb_position, joyY, joyZ, ffb_torque_value, ffb_device_gain);
     }
-
     delay(1);
 }
