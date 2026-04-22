@@ -24,14 +24,14 @@
 #define MSG_TYPE_ANALOG 0x03 // -NOT CURRENTLY USED-
 
 // Matrix keypad pins and settings.
-#define KEYPAD_ROW_0 8
-#define KEYPAD_ROW_1 9
-#define KEYPAD_ROW_2 10
-#define KEYPAD_ROW_3 11
-#define KEYPAD_COL_0 1
-#define KEYPAD_COL_1 2
-#define KEYPAD_COL_2 21
-#define KEYPAD_COL_3 47
+#define KEYPAD_ROW_0 1
+#define KEYPAD_ROW_1 2
+#define KEYPAD_ROW_2 47
+#define KEYPAD_ROW_3 21
+#define KEYPAD_COL_0 11
+#define KEYPAD_COL_1 10
+#define KEYPAD_COL_2 9
+#define KEYPAD_COL_3 8
 
 // USB CDC bridge packet settings (ESP <-> Python app).
 #define BRIDGE_START_BYTE 0xAB
@@ -70,19 +70,30 @@
 #define DEBUG_TEXT_LOG 0
 #define DEBUG_TELEMETRY_INTERVAL_MS 200
 
-// Button bit mapping.
-#define BUTTON_A 0
-#define BUTTON_B 1
+// Button bit layout sent to the PC.
+#define KEYPAD_BUTTON_COUNT 16
+#define SECONDARY_BUTTON_OFFSET 16
+#define SECONDARY_BUTTON_COUNT 16
+#define KEYPAD_DEBOUNCE_MS 20
 
 // Telemetry variables.
 int16_t joyX = 0;
 int16_t joyY = 0;
 int16_t joyZ = 0;
+uint32_t keypad_buttons = 0;
+uint32_t secondary_buttons = 0;
 uint32_t hid_buttons = 0;
 
 // UART variables for secondary controller.
 uint8_t rxBuffer[PACKET_SIZE];
 uint8_t rxIndex = 0;
+
+// Keypad variables.
+const uint8_t keypad_row_pins[4] = {KEYPAD_ROW_0, KEYPAD_ROW_1, KEYPAD_ROW_2, KEYPAD_ROW_3};
+const uint8_t keypad_col_pins[4] = {KEYPAD_COL_0, KEYPAD_COL_1, KEYPAD_COL_2, KEYPAD_COL_3};
+bool keypad_debounced_state[KEYPAD_BUTTON_COUNT] = {false};
+bool keypad_last_raw_state[KEYPAD_BUTTON_COUNT] = {false};
+uint32_t keypad_last_change_ms[KEYPAD_BUTTON_COUNT] = {0};
 
 // Hall sensor variables.
 uint16_t hall_accel_val = 0;
@@ -162,6 +173,49 @@ void hall_init() {
     analogSetPinAttenuation(HALL_BRAKE_PIN, ADC_11db);
     pinMode(HALL_ACCEL_PIN, INPUT);
     pinMode(HALL_BRAKE_PIN, INPUT);
+}
+
+void keypad_init() {
+    for (uint8_t i = 0; i < 4; i++) {
+        pinMode(keypad_row_pins[i], OUTPUT);
+        digitalWrite(keypad_row_pins[i], HIGH);
+        pinMode(keypad_col_pins[i], INPUT_PULLUP);
+    }
+}
+
+uint32_t scan_keypad_raw_mask() {
+    uint32_t mask = 0;
+    for (uint8_t row = 0; row < 4; row++) {
+        digitalWrite(keypad_row_pins[row], LOW);
+        delayMicroseconds(3);
+        for (uint8_t col = 0; col < 4; col++) {
+            if (digitalRead(keypad_col_pins[col]) == LOW) {
+                mask |= (1u << (row * 4 + col));
+            }
+        }
+        digitalWrite(keypad_row_pins[row], HIGH);
+    }
+    return mask;
+}
+
+void update_keypad_buttons() {
+    const uint32_t now_ms = millis();
+    const uint32_t raw_mask = scan_keypad_raw_mask();
+    for (uint8_t i = 0; i < KEYPAD_BUTTON_COUNT; i++) {
+        const bool raw_pressed = (raw_mask & (1u << i)) != 0;
+        if (raw_pressed != keypad_last_raw_state[i]) {
+            keypad_last_raw_state[i] = raw_pressed;
+            keypad_last_change_ms[i] = now_ms;
+        }
+        if ((uint32_t)(now_ms - keypad_last_change_ms[i]) >= KEYPAD_DEBOUNCE_MS) {
+            keypad_debounced_state[i] = raw_pressed;
+        }
+        if (keypad_debounced_state[i]) {
+            keypad_buttons |= (1u << i);
+        } else {
+            keypad_buttons &= ~(1u << i);
+        }
+    }
 }
 
 /*
@@ -245,18 +299,12 @@ void process_secondary_packet(uint8_t *packet) {
     uint16_t value = packet[3] | (packet[4] << 8);
     switch (type) {
         case MSG_TYPE_BUTTON:
-            if (id == 0) {
+            if (id < SECONDARY_BUTTON_COUNT) {
+                const uint8_t bit_index = SECONDARY_BUTTON_OFFSET + id;
                 if (value) {
-                    hid_buttons |= (1u << BUTTON_A);
+                    secondary_buttons |= (1u << bit_index);
                 } else {
-                    hid_buttons &= ~(1u << BUTTON_A);
-                }
-            }
-            if (id == 1) {
-                if (value) {
-                    hid_buttons |= (1u << BUTTON_B);
-                } else {
-                    hid_buttons &= ~(1u << BUTTON_B);
+                    secondary_buttons &= ~(1u << bit_index);
                 }
             }
             break;
@@ -521,6 +569,7 @@ void setup() {
     Serial.begin(115200);
     // Secondary UART communication for external buttons/controls.
     Serial1.begin(UART_BAUD, SERIAL_8N1, RXD1, TXD1);
+    keypad_init();
     encoder_init();
     hall_init();
     hall_calib();
@@ -530,7 +579,9 @@ void setup() {
 }
 
 void loop() {
+    update_keypad_buttons();
     handle_secondary_uart();
+    hid_buttons = keypad_buttons | secondary_buttons;
     handle_bridge_serial();
     update_position();
     joyX = get_wheel_position();
