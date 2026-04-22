@@ -6,6 +6,8 @@ Protocol (little-endian):
   [0]=0xAB [1]=0x10 [2]=seq [3:5]=x [5:7]=y [7:9]=z [9:13]=buttons_u32 [13]=crc_xor
 - PC -> ESP torque command (8 bytes):
   [0]=0xAB [1]=0x20 [2]=seq [3:5]=torque_i16 [5]=gain_u8 [6]=flags [7]=crc_xor
+- PC -> ESP control command (7 bytes):
+    [0]=0xAB [1]=0x30 [2]=seq [3]=cmd_id [4:6]=value_i16 [6]=crc_xor
 """
 
 from __future__ import annotations
@@ -27,9 +29,15 @@ import serial
 BRIDGE_START    = 0xAB
 PKT_TELEMETRY   = 0x10
 PKT_TORQUE      = 0x20
+PKT_CONTROL     = 0x30
 
 TELEMETRY_LEN   = 14
 TORQUE_LEN      = 8
+CONTROL_LEN     = 7
+
+CMD_STARTUP     = 0x01
+
+STARTUP_FLAG_AUTO_CALIB = 0x0001
 
 HID_USAGE_X     = 0x30
 HID_USAGE_Y     = 0x31
@@ -944,6 +952,38 @@ def build_torque_packet(seq: int, torque: int, gain: int = 255, flags: int = 0) 
     return bytes(msg)
 
 
+def build_control_packet(seq: int, cmd: int, value: int = 0) -> bytes:
+    cmd = max(0, min(255, int(cmd)))
+    value = max(-32768, min(32767, int(value)))
+
+    msg = bytearray(CONTROL_LEN)
+    msg[0] = BRIDGE_START
+    msg[1] = PKT_CONTROL
+    msg[2] = seq & 0xFF
+    msg[3] = cmd
+    msg[4] = value & 0xFF
+    msg[5] = (value >> 8) & 0xFF
+    msg[6] = crc_xor(msg[:-1])
+    return bytes(msg)
+
+
+def send_startup_command(
+    ser: serial.Serial,
+    startup_flags: int,
+    logger: BridgeLogger | None,
+    retries: int = 3,
+    retry_delay: float = 0.05,
+) -> None:
+    packet = build_control_packet(0, CMD_STARTUP, startup_flags)
+    for attempt in range(retries):
+        ser.write(packet)
+        if logger and logger.path:
+            logger.log(
+                f"[BOOT] startup_cmd attempt={attempt + 1}/{retries} flags=0x{startup_flags:04X} pkt={packet.hex(' ')}"
+            )
+        time.sleep(retry_delay)
+
+
 def parse_telemetry_frame(frame: bytes) -> tuple[int, int, int, int, int]:
     if len(frame) != TELEMETRY_LEN:
         raise ValueError("telemetry len invalido")
@@ -1018,7 +1058,15 @@ def run(args: argparse.Namespace) -> int:
     signal.signal(signal.SIGTERM, _sig_handler)
 
     vjoy.start()
+
+    startup_flags = 0
+    if args.auto_calib:
+        startup_flags |= STARTUP_FLAG_AUTO_CALIB
+
+    send_startup_command(ser, startup_flags, logger)
+
     print(f"Bridge iniciado. Serial={args.port} vJoyID={args.vjoy_id}")
+    print(f"Startup flags enviados al ESP: 0x{startup_flags:04X}", flush=True)
     print(
         "[TUNE] "
         f"MAX_TORQUE={torque_state.max_torque} "
@@ -1152,6 +1200,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--debug-print-interval", type=float, default=0.05, help="Intervalo minimo entre prints de debug (s)")
     p.add_argument("--verbose", action="store_true", help="Imprime telemetria/torque cada 200ms")
     p.add_argument("--force-torque", type=int, default=None, help="Si se define, ignora FFB y envia este torque constante (int16) al ESP")
+    p.add_argument("--auto-calib", action="store_true", help="Pide al ESP ejecutar calibracion completa de pedales al arrancar")
     return p
 
 

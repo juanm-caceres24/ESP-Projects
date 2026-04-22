@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <Preferences.h>
 #include "driver/pcnt.h"
 
 // Encoder pins and settings.
@@ -37,7 +38,15 @@
 #define BRIDGE_START_BYTE 0xAB
 #define BRIDGE_PKT_TELEMETRY 0x10
 #define BRIDGE_PKT_TORQUE_CMD 0x20
+#define BRIDGE_PKT_CONTROL_CMD 0x30
 #define BRIDGE_TELEMETRY_INTERVAL_MS 5
+
+// Bridge command IDs.
+#define BRIDGE_CMD_STARTUP 0x01
+
+// Startup flags bitmask (value field of BRIDGE_CMD_STARTUP).
+#define STARTUP_FLAG_AUTO_CALIB 0x0001
+#define STARTUP_FLAG_SKIP_SELF_TEST 0x0002
 
 // Driver BTS7960B pins and settings.
 #define BTS_RPWM_PIN 6
@@ -125,6 +134,10 @@ uint32_t ffb_last_position_time_us = 0;
 uint32_t last_debug_ms = 0;
 uint32_t last_bridge_telem_ms = 0;
 
+// Startup mode state (controlled by bridge command).
+bool bridge_startup_received = false;
+uint16_t bridge_startup_flags = 0;
+
 #if DEBUG_TEXT_LOG
 #define LOGF(...) Serial.printf(__VA_ARGS__)
 #define LOG(...) Serial.println(__VA_ARGS__)
@@ -173,6 +186,58 @@ void hall_init() {
     analogSetPinAttenuation(HALL_BRAKE_PIN, ADC_11db);
     pinMode(HALL_ACCEL_PIN, INPUT);
     pinMode(HALL_BRAKE_PIN, INPUT);
+}
+
+bool hall_calib_values_valid(uint16_t accel_min, uint16_t accel_max, uint16_t brake_min, uint16_t brake_max) {
+    if (accel_min >= accel_max || brake_min >= brake_max) {
+        return false;
+    }
+    if (accel_min > 4095 || accel_max > 4095 || brake_min > 4095 || brake_max > 4095) {
+        return false;
+    }
+    return true;
+}
+
+bool load_hall_calib_from_flash() {
+    Preferences prefs;
+    if (!prefs.begin("pedal_calib", true)) {
+        return false;
+    }
+    const bool valid = prefs.getBool("valid", false);
+    if (!valid) {
+        prefs.end();
+        return false;
+    }
+    const uint16_t accel_min = prefs.getUShort("acc_min", 0);
+    const uint16_t accel_max = prefs.getUShort("acc_max", 4095);
+    const uint16_t brake_min = prefs.getUShort("brk_min", 0);
+    const uint16_t brake_max = prefs.getUShort("brk_max", 4095);
+    prefs.end();
+    if (!hall_calib_values_valid(accel_min, accel_max, brake_min, brake_max)) {
+        return false;
+    }
+    hall_accel_min = accel_min;
+    hall_accel_max = accel_max;
+    hall_brake_min = brake_min;
+    hall_brake_max = brake_max;
+    return true;
+}
+
+bool save_hall_calib_to_flash() {
+    if (!hall_calib_values_valid(hall_accel_min, hall_accel_max, hall_brake_min, hall_brake_max)) {
+        return false;
+    }
+    Preferences prefs;
+    if (!prefs.begin("pedal_calib", false)) {
+        return false;
+    }
+    prefs.putUShort("acc_min", hall_accel_min);
+    prefs.putUShort("acc_max", hall_accel_max);
+    prefs.putUShort("brk_min", hall_brake_min);
+    prefs.putUShort("brk_max", hall_brake_max);
+    prefs.putBool("valid", true);
+    prefs.end();
+    return true;
 }
 
 void keypad_init() {
@@ -254,6 +319,10 @@ void update_position() {
 
 void hall_calib() {
     LOG("Calibrating...");
+    hall_accel_min = 0;
+    hall_brake_min = 0;
+    hall_accel_max = 4095;
+    hall_brake_max = 4095;
     delay(4000);
     for (int i = 0; i < CALIB_SAMPLES; i++) {
         hall_accel_val = analogRead(HALL_ACCEL_PIN);
@@ -278,7 +347,11 @@ void hall_calib() {
         }
         delay(CALIB_DELAY_BETWEEN_SAMPLES);
     }
-    LOG("Calibration done.");
+    if (save_hall_calib_to_flash()) {
+        LOG("Calibration done. Values saved to flash.");
+    } else {
+        LOG("Calibration done, but saving to flash failed.");
+    }
 }
 
 /*
@@ -346,7 +419,21 @@ uint8_t bridge_packet_len(uint8_t type) {
     if (type == BRIDGE_PKT_TORQUE_CMD) {
         return 8;
     }
+    if (type == BRIDGE_PKT_CONTROL_CMD) {
+        return 7;
+    }
     return 0;
+}
+
+void process_bridge_command(uint8_t cmd, int16_t value) {
+    switch (cmd) {
+        case BRIDGE_CMD_STARTUP:
+            bridge_startup_flags = (uint16_t)value;
+            bridge_startup_received = true;
+            break;
+        default:
+            break;
+    }
 }
 
 void process_bridge_packet(const uint8_t* pkt, uint8_t len) {
@@ -359,6 +446,12 @@ void process_bridge_packet(const uint8_t* pkt, uint8_t len) {
         uint8_t gain = pkt[5];
         ffb_torque_value = constrain(torque, -FFB_ABS_MAX_VAL, FFB_ABS_MAX_VAL);
         ffb_device_gain = gain;
+        return;
+    }
+    if (type == BRIDGE_PKT_CONTROL_CMD && len >= 7) {
+        const uint8_t cmd = pkt[3];
+        const int16_t value = (int16_t)((uint16_t)pkt[4] | ((uint16_t)pkt[5] << 8));
+        process_bridge_command(cmd, value);
     }
 }
 
@@ -565,16 +658,31 @@ void motor_self_test() {
 }
 
 void setup() {
-    // USB CDC serial is now the only host interface (no HID joystick descriptor).
+    // USB CDC serial is the host interface used to receive startup command and runtime packets.
     Serial.begin(115200);
-    // Secondary UART communication for external buttons/controls.
+    // Wait until the bridge sends a startup command.
+    while (!bridge_startup_received) {
+        handle_bridge_serial();
+        delay(1);
+    }
+    // Normal peripheral initialization only after startup command.
     Serial1.begin(UART_BAUD, SERIAL_8N1, RXD1, TXD1);
     keypad_init();
     encoder_init();
     hall_init();
-    hall_calib();
     motor_init();
-    motor_self_test();
+    const bool auto_calib = (bridge_startup_flags & STARTUP_FLAG_AUTO_CALIB) != 0;
+    const bool skip_self_test = (bridge_startup_flags & STARTUP_FLAG_SKIP_SELF_TEST) != 0;
+    if (auto_calib) {
+        hall_calib();
+    } else if (!load_hall_calib_from_flash()) {
+        LOG("No valid pedal calibration in flash. Using default full ADC range.");
+    }
+
+    if (!skip_self_test) {
+        motor_self_test();
+    }
+
     pcnt_get_counter_value(PCNT_UNIT_USED, &ffb_position);
 }
 
