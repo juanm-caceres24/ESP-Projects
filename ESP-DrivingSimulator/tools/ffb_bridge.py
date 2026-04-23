@@ -684,7 +684,10 @@ class FFBEffectsManager:
             constant_base = self._constant.get(block, 0) / 10000.0
 
             if effect_type == ET_CONST:
-                force = (constant_base * x_scale) * self.CONST_FORCE_SCALE
+                # On single-axis wheels, constant effect magnitude already carries direction/sign.
+                # Applying HID polar direction here can collapse torque near zero in some games
+                # (e.g. direction around 90deg -> cos ~ 0), even when magnitude is high.
+                force = constant_base * self.CONST_FORCE_SCALE
             elif effect_type == ET_RAMP:
                 start, end = self._ramp.get(block, (0, 0))
                 if duration_ms in (0, 0xFFFF):
