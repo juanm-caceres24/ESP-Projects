@@ -74,6 +74,7 @@
 #define MOTOR_SELF_TEST_POS_TOL 60
 #define MOTOR_SELF_TEST_HOLD_TIME_MS 500
 #define MOTOR_SELF_TEST_TIMEOUT_MS 5000
+#define MOTOR_SELF_TEST_POSITION 2250 // Position in [encoder counts] to move during self-test.
 
 // Debug settings.
 #define DEBUG_TEXT_LOG 0
@@ -574,7 +575,7 @@ void motor_self_test() {
     uint32_t start_time = millis();
     uint32_t hold_position_time = 0;
     uint8_t last_holding_position_flag = false;
-    int16_t target_position = -WHEEL_MAX_POSITION;
+    int16_t target_position = -MOTOR_SELF_TEST_POSITION;
     reset_position_pid_state();
     while (true) {
         update_position();
@@ -602,7 +603,7 @@ void motor_self_test() {
     start_time = millis();
     hold_position_time = 0;
     last_holding_position_flag = false;
-    target_position = WHEEL_MAX_POSITION;
+    target_position = MOTOR_SELF_TEST_POSITION;
     reset_position_pid_state();
     while (true) {
         update_position();
