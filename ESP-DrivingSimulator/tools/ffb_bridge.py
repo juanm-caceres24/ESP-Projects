@@ -316,7 +316,7 @@ class TorqueState:
 
 class FFBEffectsManager:
     # Torque output tunables: edit these to match your wheel motor/driver behavior.
-    MAX_TORQUE              = 270
+    MAX_TORQUE              = 300
     USE_MIN_TORQUE_COMP     = True
     MIN_TORQUE              = 160
     INPUT_DEADZONE          = 5
