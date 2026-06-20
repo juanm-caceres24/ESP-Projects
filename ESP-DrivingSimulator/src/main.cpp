@@ -83,16 +83,16 @@
 // Button bit layout sent to the PC.
 #define KEYPAD_BUTTON_COUNT 16
 #define SECONDARY_BUTTON_OFFSET 16
-#define SECONDARY_BUTTON_COUNT 16
+#define SECONDARY_BUTTON_COUNT 32
 #define KEYPAD_DEBOUNCE_MS 20
 
 // Telemetry variables.
 int16_t joyX = 0;
 int16_t joyY = 0;
 int16_t joyZ = 0;
-uint32_t keypad_buttons = 0;
-uint32_t secondary_buttons = 0;
-uint32_t hid_buttons = 0;
+uint64_t keypad_buttons = 0;
+uint64_t secondary_buttons = 0;
+uint64_t hid_buttons = 0;
 
 // UART variables for secondary controller.
 uint8_t rxBuffer[PACKET_SIZE];
@@ -277,9 +277,9 @@ void update_keypad_buttons() {
             keypad_debounced_state[i] = raw_pressed;
         }
         if (keypad_debounced_state[i]) {
-            keypad_buttons |= (1u << i);
+            keypad_buttons |= (1ULL << i);
         } else {
-            keypad_buttons &= ~(1u << i);
+            keypad_buttons &= ~(1ULL << i);
         }
     }
 }
@@ -376,9 +376,9 @@ void process_secondary_packet(uint8_t *packet) {
             if (id < SECONDARY_BUTTON_COUNT) {
                 const uint8_t bit_index = SECONDARY_BUTTON_OFFSET + id;
                 if (value) {
-                    secondary_buttons |= (1u << bit_index);
+                    secondary_buttons |= (1ULL << bit_index);
                 } else {
-                    secondary_buttons &= ~(1u << bit_index);
+                    secondary_buttons &= ~(1ULL << bit_index);
                 }
             }
             break;
@@ -493,7 +493,7 @@ void handle_bridge_serial() {
 }
 
 void send_bridge_telemetry() {
-    uint8_t pkt[14];
+    uint8_t pkt[18];
     pkt[0] = BRIDGE_START_BYTE;
     pkt[1] = BRIDGE_PKT_TELEMETRY;
     pkt[2] = 0; // Reserved for sequence number.
@@ -503,11 +503,15 @@ void send_bridge_telemetry() {
     pkt[6] = (uint8_t)((joyY >> 8) & 0xFF);
     pkt[7] = (uint8_t)(joyZ & 0xFF);
     pkt[8] = (uint8_t)((joyZ >> 8) & 0xFF);
-    pkt[9] = (uint8_t)(hid_buttons & 0xFF);
+    pkt[9]  = (uint8_t)(hid_buttons & 0xFF);
     pkt[10] = (uint8_t)((hid_buttons >> 8) & 0xFF);
     pkt[11] = (uint8_t)((hid_buttons >> 16) & 0xFF);
     pkt[12] = (uint8_t)((hid_buttons >> 24) & 0xFF);
-    pkt[13] = calculate_crc_xor(pkt, 13);
+    pkt[13] = (uint8_t)((hid_buttons >> 32) & 0xFF);
+    pkt[14] = (uint8_t)((hid_buttons >> 40) & 0xFF);
+    pkt[15] = (uint8_t)((hid_buttons >> 48) & 0xFF);
+    pkt[16] = (uint8_t)((hid_buttons >> 56) & 0xFF);
+    pkt[17] = calculate_crc_xor(pkt, 17);
     Serial.write(pkt, sizeof(pkt));
 }
 

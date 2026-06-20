@@ -12,16 +12,45 @@
 #define KEYPAD_BUTTON_COUNT (KEYPAD_ROWS * KEYPAD_COLS)
 #define KEYPAD_DEBOUNCE_MS 20
 #define MATRIX_BUTTON_OFFSET NUM_BUTTONS
+#define ENCODER_PULSE_DURATION_MS 100
+#define NUM_ENCODERS 3
+#define NUM_VIRTUAL_BUTTONS 12
+#define VIRTUAL_BUTTON_OFFSET (MATRIX_BUTTON_OFFSET + KEYPAD_BUTTON_COUNT)
 
-uint8_t button_pins[NUM_BUTTONS] = {13, 32};
-bool button_state[NUM_BUTTONS];
-bool last_button_state[NUM_BUTTONS];
-unsigned long last_debounce_time[NUM_BUTTONS];
-const uint8_t keypad_row_pins[KEYPAD_ROWS] = {14, 27, 26}; 
-const uint8_t keypad_col_pins[KEYPAD_COLS] = {25, 33, 18, 19};
-bool keypad_debounced_state[KEYPAD_BUTTON_COUNT] = {false};
-bool keypad_last_raw_state[KEYPAD_BUTTON_COUNT] = {false};
-uint32_t keypad_last_change_ms[KEYPAD_BUTTON_COUNT] = {0};
+uint8_t button_pins[NUM_BUTTONS] = { 13, 32 };
+bool button_state[NUM_BUTTONS] = { false, false };
+bool last_button_state[NUM_BUTTONS] = { false, false };
+unsigned long last_debounce_time[NUM_BUTTONS] = { 0, 0 };
+const uint8_t keypad_row_pins[KEYPAD_ROWS] = { 14, 27, 26 }; 
+const uint8_t keypad_col_pins[KEYPAD_COLS] = { 25, 33, 18, 19 };
+bool keypad_debounced_state[KEYPAD_BUTTON_COUNT] = { false };
+bool keypad_last_raw_state[KEYPAD_BUTTON_COUNT] = { false };
+uint32_t keypad_last_change_ms[KEYPAD_BUTTON_COUNT] = { 0 };
+unsigned long virtual_btn_timer[NUM_VIRTUAL_BUTTONS] = { 0 };
+bool virtual_btn_state[NUM_VIRTUAL_BUTTONS] = { false };
+
+struct EncoderData {
+    uint8_t pinCLK;
+    uint8_t pinDT;
+    uint8_t pinSW;
+    int lastCLK;
+    bool altMode;
+    uint8_t idCW_Norm;
+    uint8_t idCCW_Norm;
+    uint8_t idCW_Alt;
+    uint8_t idCCW_Alt;
+    unsigned long debounceSW;
+    bool lastSW;
+};
+
+EncoderData encoders[NUM_ENCODERS] = {
+    // Encoder 0: pins 1, 22, 23 | virtual IDs: 14, 15 (Normal) - 16, 17 (Alternative)
+    {23, 22, 1, 0, false, 14, 15, 16, 17, 0, HIGH},
+    // Encoder 1: pins 4, 2, 15 | virtual IDs: 18, 19 (Normal) - 20, 21 (Alternative)
+    {4, 2, 15, 0, false, 18, 19, 20, 21, 0, HIGH},
+    // Encoder 2: pins 35, 34, 36 | virtual IDs: 22, 23 (Normal) - 24, 25 (Alternative)
+    {5, 21, 3, 0, false, 22, 23, 24, 25, 0, HIGH}
+};
 
 uint8_t calculate_CRC(uint8_t *data) {
     uint8_t crc = 0;
@@ -40,6 +69,47 @@ void send_button_event(uint8_t id, bool state) {
     packet[4] = 0;
     packet[5] = calculate_CRC(packet);
     Serial1.write(packet, 6);
+}
+
+void trigger_virtual_button(uint8_t id) {
+    uint8_t idx = id - VIRTUAL_BUTTON_OFFSET;
+    if (idx < NUM_VIRTUAL_BUTTONS) {
+        if (!virtual_btn_state[idx]) {
+            virtual_btn_state[idx] = true;
+            send_button_event(id, true);
+        }
+        virtual_btn_timer[idx] = millis();
+    }
+}
+
+void update_encoders() {
+    unsigned long now = millis();
+    for (int i = 0; i < NUM_ENCODERS; i++) {
+        bool sw_state = digitalRead(encoders[i].pinSW);
+        if (sw_state == LOW && encoders[i].lastSW == HIGH && (now - encoders[i].debounceSW > 200)) {
+            encoders[i].altMode = !encoders[i].altMode;
+            encoders[i].debounceSW = now;
+        }
+        encoders[i].lastSW = sw_state;
+        int clk_state = digitalRead(encoders[i].pinCLK);
+        if (clk_state != encoders[i].lastCLK && clk_state == LOW) {
+            int dt_state = digitalRead(encoders[i].pinDT);
+            if (dt_state == HIGH) {
+                trigger_virtual_button(encoders[i].altMode ? encoders[i].idCW_Alt : encoders[i].idCW_Norm);
+            } else {
+                trigger_virtual_button(encoders[i].altMode ? encoders[i].idCCW_Alt : encoders[i].idCCW_Norm);
+            }
+        }
+        encoders[i].lastCLK = clk_state;
+    }
+    for (uint8_t i = 0; i < NUM_VIRTUAL_BUTTONS; i++) {
+        if (virtual_btn_state[i]) {
+            if (now - virtual_btn_timer[i] >= ENCODER_PULSE_DURATION_MS) {
+                virtual_btn_state[i] = false;
+                send_button_event(VIRTUAL_BUTTON_OFFSET + i, false);
+            }
+        }
+    }
 }
 
 void keypad_init() {
@@ -89,11 +159,14 @@ void setup() {
     Serial1.begin(UART_BAUD, SERIAL_8N1, RXD1_PIN, TXD1_PIN);
     for (int i = 0; i < NUM_BUTTONS; i++) {
         pinMode(button_pins[i], INPUT_PULLUP);
-        button_state[i] = false;
-        last_button_state[i] = false;
-        last_debounce_time[i] = 0;
     }
     keypad_init();
+    for (int i = 0; i < NUM_ENCODERS; i++) {
+        pinMode(encoders[i].pinCLK, INPUT_PULLUP);
+        pinMode(encoders[i].pinDT, INPUT_PULLUP);
+        pinMode(encoders[i].pinSW, INPUT_PULLUP);
+        encoders[i].lastCLK = digitalRead(encoders[i].pinCLK);
+    }
 }
 
 void loop() {
@@ -111,4 +184,5 @@ void loop() {
         last_button_state[i] = reading;
     }
     update_keypad_buttons();
+    update_encoders();
 }

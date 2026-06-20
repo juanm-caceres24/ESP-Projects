@@ -2,7 +2,7 @@
 """ESP wheel bridge: Serial telemetry <-> vJoy axes/buttons <-> FFB torque back to ESP.
 
 Protocol (little-endian):
-- ESP -> PC telemetry (14 bytes):
+- ESP -> PC telemetry (18 bytes):
   [0]=0xAB [1]=0x10 [2]=seq [3:5]=x [5:7]=y [7:9]=z [9:13]=buttons_u32 [13]=crc_xor
 - PC -> ESP torque command (8 bytes):
   [0]=0xAB [1]=0x20 [2]=seq [3:5]=torque_i16 [5]=gain_u8 [6]=flags [7]=crc_xor
@@ -31,7 +31,7 @@ PKT_TELEMETRY   = 0x10
 PKT_TORQUE      = 0x20
 PKT_CONTROL     = 0x30
 
-TELEMETRY_LEN   = 14
+TELEMETRY_LEN   = 18
 TORQUE_LEN      = 8
 CONTROL_LEN     = 7
 
@@ -999,7 +999,7 @@ def parse_telemetry_frame(frame: bytes) -> tuple[int, int, int, int, int]:
     x = int.from_bytes(frame[3:5], "little", signed=True)
     y = int.from_bytes(frame[5:7], "little", signed=True)
     z = int.from_bytes(frame[7:9], "little", signed=True)
-    buttons = int.from_bytes(frame[9:13], "little", signed=False)
+    buttons = int.from_bytes(frame[9:17], "little", signed=False)
     return seq, x, y, z, buttons
 
 
@@ -1096,6 +1096,7 @@ def run(args: argparse.Namespace) -> int:
         if logger.path:
             logger.log(f"[TEST] constant_torque_enabled torque={forced_torque}")
 
+    last_buttons_state = -1
     try:
         while not stop_event.is_set():
             chunk = ser.read(256)
@@ -1115,6 +1116,12 @@ def run(args: argparse.Namespace) -> int:
                     _seq, x, y, z, buttons = parse_telemetry_frame(frame)
                     torque_state.update_motion(x)
                     vjoy.update_axes_buttons(x, y, z, buttons)
+
+                    if buttons != last_buttons_state:
+                        active_btns = [i for i in range(64) if (buttons & (1 << i))]
+                        print(f"[BUTTONS] Pressed: {active_btns}", flush=True)
+                        last_buttons_state = buttons
+
                     last_axes = (x, y, z)
                     if logger.path:
                         logger.log(
