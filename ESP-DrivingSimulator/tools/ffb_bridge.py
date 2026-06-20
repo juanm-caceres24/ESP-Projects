@@ -1096,7 +1096,6 @@ def run(args: argparse.Namespace) -> int:
         if logger.path:
             logger.log(f"[TEST] constant_torque_enabled torque={forced_torque}")
 
-    last_buttons_state = -1
     try:
         while not stop_event.is_set():
             chunk = ser.read(256)
@@ -1116,12 +1115,6 @@ def run(args: argparse.Namespace) -> int:
                     _seq, x, y, z, buttons = parse_telemetry_frame(frame)
                     torque_state.update_motion(x)
                     vjoy.update_axes_buttons(x, y, z, buttons)
-
-                    if buttons != last_buttons_state:
-                        active_btns = [i for i in range(64) if (buttons & (1 << i))]
-                        print(f"[BUTTONS] Pressed: {active_btns}", flush=True)
-                        last_buttons_state = buttons
-
                     last_axes = (x, y, z)
                     if logger.path:
                         logger.log(
