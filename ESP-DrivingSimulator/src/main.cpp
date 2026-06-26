@@ -6,13 +6,13 @@
 #define ENCODER_PIN_A 4
 #define ENCODER_PIN_B 5
 #define PCNT_UNIT_USED PCNT_UNIT_0
-#define WHEEL_MAX_POSITION 6750 // Max position in [encoder counts]
+#define WHEEL_MAX_POSITION 4500 // Max position in [encoder counts] (600 ppr * 4) * (60T / 16T) = 9000 counts = 360 degrees => 4500 counts = 180 degrees (360 degrees total).
 
 // HALL sensors pins and settings.
 #define HALL_ACCEL_PIN 14
 #define HALL_BRAKE_PIN 13
 #define CALIB_SAMPLES 50
-#define CALIB_DELAY_BETWEEN_SAMPLES 10 // Delay in [ms]
+#define CALIB_DELAY_BETWEEN_SAMPLES_MS 10 // Delay in [ms]
 
 // UART pins and settings for secondary controller inputs (buttons/extra controls).
 #define RXD1 18
@@ -334,7 +334,7 @@ void hall_calib() {
         if (hall_brake_val > hall_brake_min) {
             hall_brake_min = hall_brake_val;
         }
-        delay(CALIB_DELAY_BETWEEN_SAMPLES);
+        delay(CALIB_DELAY_BETWEEN_SAMPLES_MS);
     }
     delay(4000);
     for (int i = 0; i < CALIB_SAMPLES; i++) {
@@ -346,7 +346,7 @@ void hall_calib() {
         if (hall_brake_val < hall_brake_max) {
             hall_brake_max = hall_brake_val;
         }
-        delay(CALIB_DELAY_BETWEEN_SAMPLES);
+        delay(CALIB_DELAY_BETWEEN_SAMPLES_MS);
     }
     if (save_hall_calib_to_flash()) {
         LOG("Calibration done. Values saved to flash.");
@@ -683,11 +683,9 @@ void setup() {
     } else if (!load_hall_calib_from_flash()) {
         LOG("No valid pedal calibration in flash. Using default full ADC range.");
     }
-
     if (!skip_self_test) {
         motor_self_test();
     }
-
     pcnt_get_counter_value(PCNT_UNIT_USED, &ffb_position);
 }
 
