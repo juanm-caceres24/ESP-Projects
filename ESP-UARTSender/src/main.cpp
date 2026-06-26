@@ -6,16 +6,17 @@
 #define START_BYTE 0xAA
 #define MSG_TYPE_BUTTON 0x01
 #define NUM_BUTTONS 2
-#define DEBOUNCE_DELAY 20
+#define BUTTON_DEBOUNCE_MS 20
 #define KEYPAD_ROWS 3
 #define KEYPAD_COLS 4
 #define KEYPAD_BUTTON_COUNT (KEYPAD_ROWS * KEYPAD_COLS)
 #define KEYPAD_DEBOUNCE_MS 20
-#define MATRIX_BUTTON_OFFSET NUM_BUTTONS
+#define KEYPAD_BUTTON_OFFSET NUM_BUTTONS
 #define ENCODER_PULSE_DURATION_MS 100
+#define ENCODER_DEBOUNCE_MS 150
 #define NUM_ENCODERS 3
 #define NUM_VIRTUAL_BUTTONS 12
-#define VIRTUAL_BUTTON_OFFSET (MATRIX_BUTTON_OFFSET + KEYPAD_BUTTON_COUNT)
+#define VIRTUAL_BUTTON_OFFSET (KEYPAD_BUTTON_OFFSET + KEYPAD_BUTTON_COUNT)
 
 uint8_t button_pins[NUM_BUTTONS] = { 13, 32 };
 bool button_state[NUM_BUTTONS] = { false, false };
@@ -41,6 +42,8 @@ struct EncoderData {
     uint8_t idCCW_Alt;
     unsigned long debounceSW;
     bool lastSW;
+    unsigned long lastRotationTime; 
+    bool lastDirectionCW;
 };
 
 EncoderData encoders[NUM_ENCODERS] = {
@@ -86,7 +89,7 @@ void update_encoders() {
     unsigned long now = millis();
     for (int i = 0; i < NUM_ENCODERS; i++) {
         bool sw_state = digitalRead(encoders[i].pinSW);
-        if (sw_state == LOW && encoders[i].lastSW == HIGH && (now - encoders[i].debounceSW > 200)) {
+        if (sw_state == LOW && encoders[i].lastSW == HIGH && (now - encoders[i].debounceSW > ENCODER_DEBOUNCE_MS)) {
             encoders[i].altMode = !encoders[i].altMode;
             encoders[i].debounceSW = now;
         }
@@ -94,10 +97,17 @@ void update_encoders() {
         int clk_state = digitalRead(encoders[i].pinCLK);
         if (clk_state != encoders[i].lastCLK && clk_state == LOW) {
             int dt_state = digitalRead(encoders[i].pinDT);
-            if (dt_state == HIGH) {
-                trigger_virtual_button(encoders[i].altMode ? encoders[i].idCW_Alt : encoders[i].idCW_Norm);
+            bool isCW = (dt_state == HIGH);
+            bool isReversal = (isCW != encoders[i].lastDirectionCW);
+            if (isReversal && (now - encoders[i].lastRotationTime < ENCODER_DEBOUNCE_MS)) {
             } else {
-                trigger_virtual_button(encoders[i].altMode ? encoders[i].idCCW_Alt : encoders[i].idCCW_Norm);
+                encoders[i].lastDirectionCW = isCW;
+                encoders[i].lastRotationTime = now;
+                if (isCW) {
+                    trigger_virtual_button(encoders[i].altMode ? encoders[i].idCW_Alt : encoders[i].idCW_Norm);
+                } else {
+                    trigger_virtual_button(encoders[i].altMode ? encoders[i].idCCW_Alt : encoders[i].idCCW_Norm);
+                }
             }
         }
         encoders[i].lastCLK = clk_state;
@@ -149,7 +159,7 @@ void update_keypad_buttons() {
         if ((uint32_t)(now_ms - keypad_last_change_ms[i]) >= KEYPAD_DEBOUNCE_MS) {
             if (keypad_debounced_state[i] != raw_pressed) {
                 keypad_debounced_state[i] = raw_pressed;
-                send_button_event(MATRIX_BUTTON_OFFSET + i, keypad_debounced_state[i]);
+                send_button_event(KEYPAD_BUTTON_OFFSET + i, keypad_debounced_state[i]);
             }
         }
     }
@@ -175,7 +185,7 @@ void loop() {
         if (reading != last_button_state[i]) {
             last_debounce_time[i] = millis();
         }
-        if ((millis() - last_debounce_time[i]) > DEBOUNCE_DELAY) {
+        if ((millis() - last_debounce_time[i]) > BUTTON_DEBOUNCE_MS) {
             if (reading != button_state[i]) {
                 button_state[i] = reading;
                 send_button_event(i, button_state[i]);

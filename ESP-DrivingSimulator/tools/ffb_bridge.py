@@ -42,6 +42,10 @@ STARTUP_FLAG_AUTO_CALIB = 0x0001
 HID_USAGE_X     = 0x30
 HID_USAGE_Y     = 0x31
 HID_USAGE_Z     = 0x32
+HID_USAGE_RX    = 0x33
+HID_USAGE_RY    = 0x34
+HID_USAGE_SL0   = 0x36 # Slider 1
+HID_USAGE_SL1   = 0x37 # Slider 2
 
 ERROR_SUCCESS   = 0
 
@@ -771,6 +775,12 @@ class VJoyBridge:
         self.effects = FFBEffectsManager(self.dll, self.torque_state, self._log_ffb, ffb_debug_enabled)
         self._ffb_cb_ref = None
         self.axis_ranges: dict[int, AxisRange] = {}
+        
+        # --- Variables persistentes para los potenciómetros virtuales (Sliders) ---
+        self.slider0_val = 0.0 # Normalizado de 0.0 (mínimo) a 1.0 (máximo)
+        self.slider1_val = 0.0 
+        self.slider_step = 0.05 # Cuánto avanza por "clic" del encoder (5%)
+        self.last_buttons = 0  # Para guardar el estado anterior y detectar cambios
 
     def _log_ffb(self, msg: str) -> None:
         if self.logger is not None:
@@ -825,6 +835,10 @@ class VJoyBridge:
 
         d.SetBtn.argtypes = [ctypes.c_bool, ctypes.c_uint, ctypes.c_ubyte]
         d.SetBtn.restype = ctypes.c_bool
+        
+        # Prototype para el POV/HAT direccional
+        d.SetDiscPov.argtypes = [ctypes.c_int, ctypes.c_uint, ctypes.c_ubyte]
+        d.SetDiscPov.restype = ctypes.c_bool
 
         d.GetVJDAxisMin.argtypes = [ctypes.c_uint, ctypes.c_uint, ctypes.POINTER(ctypes.c_long)]
         d.GetVJDAxisMin.restype = ctypes.c_bool
@@ -877,9 +891,14 @@ class VJoyBridge:
             raise RuntimeError(f"No se pudo adquirir vJoy ID {self.vjoy_id}.")
         self.dll.ResetVJD(self.vjoy_id)
 
+        # Adquirir los rangos de todos los ejes a utilizar
         self.axis_ranges[HID_USAGE_X] = self._get_axis_range(HID_USAGE_X)
         self.axis_ranges[HID_USAGE_Y] = self._get_axis_range(HID_USAGE_Y)
         self.axis_ranges[HID_USAGE_Z] = self._get_axis_range(HID_USAGE_Z)
+        self.axis_ranges[HID_USAGE_RX] = self._get_axis_range(HID_USAGE_RX)
+        self.axis_ranges[HID_USAGE_RY] = self._get_axis_range(HID_USAGE_RY)
+        self.axis_ranges[HID_USAGE_SL0] = self._get_axis_range(HID_USAGE_SL0)
+        self.axis_ranges[HID_USAGE_SL1] = self._get_axis_range(HID_USAGE_SL1)
 
         def _ffb_cb(data_ptr: int, _user_data: int) -> None:
             if not data_ptr:
@@ -900,13 +919,14 @@ class VJoyBridge:
     def _get_axis_range(self, usage: int) -> AxisRange:
         min_v = ctypes.c_long(0)
         max_v = ctypes.c_long(0)
+        # Si vJoy no tiene el eje habilitado, asignamos un rango seguro de fallback (0 - 32767)
         if not self.dll.GetVJDAxisMin(self.vjoy_id, usage, ctypes.byref(min_v)):
-            raise RuntimeError(f"No se pudo leer minimo del eje usage=0x{usage:02X}")
-        if not self.dll.GetVJDAxisMax(self.vjoy_id, usage, ctypes.byref(max_v)):
-            raise RuntimeError(f"No se pudo leer maximo del eje usage=0x{usage:02X}")
+            return AxisRange(0, 32767) 
+        self.dll.GetVJDAxisMax(self.vjoy_id, usage, ctypes.byref(max_v))
         return AxisRange(min_v.value, max_v.value)
 
     def update_axes_buttons(self, x: int, y: int, z: int, buttons: int) -> None:
+        # --- EJES PRINCIPALES ---
         vx = map_i16_to_axis(x, self.axis_ranges[HID_USAGE_X])
         vy = map_i16_to_axis(y, self.axis_ranges[HID_USAGE_Y])
         vz = map_i16_to_axis(z, self.axis_ranges[HID_USAGE_Z])
@@ -915,9 +935,58 @@ class VJoyBridge:
         self.dll.SetAxis(vy, self.vjoy_id, HID_USAGE_Y)
         self.dll.SetAxis(vz, self.vjoy_id, HID_USAGE_Z)
 
+        # --- BOTONES NORMALES (Límite físico del sistema = 32 botones, Bits 0 al 31) ---
         for i in range(32):
             pressed = bool((buttons >> i) & 1)
             self.dll.SetBtn(pressed, self.vjoy_id, i + 1)
+
+
+        # --- TRADUCCIÓN DE BITS OCULTOS (Bits 32 al 41 -> Encoders) ---
+        
+        # 1. ENCODER 0 (Alt) -> Pulso en ejes RX y RY (Bits 32, 33)
+        rx_max = self.axis_ranges[HID_USAGE_RX].max_val
+        rx_min = self.axis_ranges[HID_USAGE_RX].min_val
+        ry_max = self.axis_ranges[HID_USAGE_RY].max_val
+        ry_min = self.axis_ranges[HID_USAGE_RY].min_val
+        
+        self.dll.SetAxis(rx_max if (buttons & (1 << 32)) else rx_min, self.vjoy_id, HID_USAGE_RX)
+        self.dll.SetAxis(ry_max if (buttons & (1 << 33)) else ry_min, self.vjoy_id, HID_USAGE_RY)
+
+        # 2. ENCODERS 1 y 2 (Norm) -> HAT (POV Direccional)
+        # Valores de vJoy Discrete Pov: 0=Norte(Arriba), 1=Este(Derecha), 2=Sur(Abajo), 3=Oeste(Izquierda), -1=Soltado
+        pov_val = -1
+        if (buttons & (1 << 35)):   pov_val = 0 # Enc 1 Arriba (CCW)
+        elif (buttons & (1 << 38)): pov_val = 3 # Enc 2 Izquierda (CW) <-- INVERTIDO
+        elif (buttons & (1 << 34)): pov_val = 2 # Enc 1 Abajo (CW)
+        elif (buttons & (1 << 39)): pov_val = 1 # Enc 2 Derecha (CCW) <-- INVERTIDO
+        
+        self.dll.SetDiscPov(pov_val, self.vjoy_id, 1)
+
+        # 3. ENCODERS 1 y 2 (Alt) -> Sliders Potenciómetros
+        # Analizamos el flanco de subida (que haya pulsado en este frame y no en el anterior)
+        # <-- INVERTIDO EL SENTIDO (+ / -) DE AMBOS SLIDERS -->
+        if (buttons & (1 << 36)) and not (self.last_buttons & (1 << 36)): # Enc 1 CW
+            self.slider0_val = max(0.0, self.slider0_val - self.slider_step) 
+        if (buttons & (1 << 37)) and not (self.last_buttons & (1 << 37)): # Enc 1 CCW
+            self.slider0_val = min(1.0, self.slider0_val + self.slider_step)
+
+        if (buttons & (1 << 40)) and not (self.last_buttons & (1 << 40)): # Enc 2 CW
+            self.slider1_val = max(0.0, self.slider1_val - self.slider_step)
+        if (buttons & (1 << 41)) and not (self.last_buttons & (1 << 41)): # Enc 2 CCW
+            self.slider1_val = min(1.0, self.slider1_val + self.slider_step)
+
+        # Calculamos el valor real del eje para pasarlo a vJoy
+        sl0_range = self.axis_ranges[HID_USAGE_SL0]
+        sl1_range = self.axis_ranges[HID_USAGE_SL1]
+        
+        vsl0 = sl0_range.min_val + int(round(self.slider0_val * (sl0_range.max_val - sl0_range.min_val)))
+        vsl1 = sl1_range.min_val + int(round(self.slider1_val * (sl1_range.max_val - sl1_range.min_val)))
+        
+        self.dll.SetAxis(vsl0, self.vjoy_id, HID_USAGE_SL0)
+        self.dll.SetAxis(vsl1, self.vjoy_id, HID_USAGE_SL1)
+
+        # Guardamos los botones de este frame para analizarlos en el siguiente
+        self.last_buttons = buttons
 
     def tick_effects(self, now: float) -> None:
         self.effects.tick(now)
